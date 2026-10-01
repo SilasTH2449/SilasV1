@@ -1,22 +1,25 @@
--- Syrex Hub Ultimate V28 (Modern Dark Tabbed UI)
+-- Syrex Hub Ultimate V29 (Inspect + Gun Mods + Config System + Toggle Key)
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- Global Config
+-- Config Values
 local espEnabled = true
+local inspectEnabled = true
 local teamCheckEnabled = false
 local aimbotEnabled = false
 local wallCheckEnabled = true
 local fovEnabled = true
 local instantPickupEnabled = false
 local hitboxExpanded = false
+local recoilControlEnabled = true
 
 -- Settings Data
 local hitboxSizes = {4, 7, 10, 15}
@@ -45,16 +48,17 @@ local currentLeadIndex = 3
 local leadFactor = leadMultipliers[currentLeadIndex]
 
 local stickyTarget = nil
+local configFileName = "SyrexHub_Config.json"
 
 -- Clean Old UI
 local parentGui = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
-if parentGui:FindFirstChild("SyrexHub_v28") then
-    parentGui:FindFirstChild("SyrexHub_v28"):Destroy()
+if parentGui:FindFirstChild("SyrexHub_v29") then
+    parentGui:FindFirstChild("SyrexHub_v29"):Destroy()
 end
 
 -- ScreenGui Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SyrexHub_v28"
+ScreenGui.Name = "SyrexHub_v29"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = parentGui
 
@@ -64,8 +68,8 @@ MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.3, 0, 0.25, 0)
-MainFrame.Size = UDim2.new(0, 560, 0, 380)
+MainFrame.Position = UDim2.new(0.3, 0, 0.22, 0)
+MainFrame.Size = UDim2.new(0, 580, 0, 410)
 MainFrame.Active = true
 MainFrame.Draggable = true
 
@@ -73,7 +77,7 @@ local mainCorner = Instance.new("UICorner")
 mainCorner.CornerRadius = UDim.new(0, 8)
 mainCorner.Parent = MainFrame
 
--- Top/Sidebar Layout
+-- Sidebar Layout
 local Sidebar = Instance.new("Frame")
 Sidebar.Name = "Sidebar"
 Sidebar.Parent = MainFrame
@@ -101,7 +105,7 @@ SubTitle.Parent = HubTitle
 SubTitle.Size = UDim2.new(1, 0, 0, 15)
 SubTitle.Position = UDim2.new(0, 0, 0, 22)
 SubTitle.BackgroundTransparency = 1
-SubTitle.Text = "v28 • WarZ / PVP Edition"
+SubTitle.Text = "v29 • [Right-Ctrl Toggle]"
 SubTitle.TextColor3 = Color3.fromRGB(120, 120, 130)
 SubTitle.TextSize = 10
 SubTitle.Font = Enum.Font.Gotham
@@ -118,7 +122,7 @@ tabLayout.Parent = TabList
 tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 tabLayout.Padding = UDim.new(0, 6)
 
--- Content Area (Right Side)
+-- Content Area
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "ContentArea"
 ContentArea.Parent = MainFrame
@@ -127,7 +131,6 @@ ContentArea.Size = UDim2.new(1, -180, 1, -20)
 ContentArea.BackgroundTransparency = 1
 
 local pages = {}
-local activeTabBtn = nil
 
 local function createPage(pageName)
     local page = Instance.new("ScrollingFrame")
@@ -234,17 +237,25 @@ local function addToggle(page, labelText, defaultState, callback)
     btn.BackgroundTransparency = 1
     btn.Text = ""
 
-    btn.MouseButton1Click:Connect(function()
-        state = not state
-        if state then
+    local function updateVisuals(st)
+        if st then
             TweenService:Create(switchBg, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
             TweenService:Create(dot, TweenInfo.new(0.15), {Position = UDim2.new(1, -18, 0.5, -7), BackgroundColor3 = Color3.fromRGB(15, 15, 20)}):Play()
         else
             TweenService:Create(switchBg, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}):Play()
             TweenService:Create(dot, TweenInfo.new(0.15), {Position = UDim2.new(0, 3, 0.5, -7), BackgroundColor3 = Color3.fromRGB(180, 180, 190)}):Play()
         end
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        updateVisuals(state)
         callback(state)
     end)
+    return function(newState)
+        state = newState
+        updateVisuals(state)
+    end
 end
 
 local function addClicker(page, labelText, defaultValText, callback)
@@ -292,16 +303,36 @@ local function addClicker(page, labelText, defaultValText, callback)
         local newVal = callback()
         if newVal then valBox.Text = newVal end
     end)
+    return function(txt) valBox.Text = txt end
+end
+
+local function addButton(page, btnText, callback)
+    local btn = Instance.new("TextButton")
+    btn.Parent = page
+    btn.Size = UDim2.new(1, 0, 0, 36)
+    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+    btn.Text = btnText
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 12
+    btn.Font = Enum.Font.GothamBold
+
+    local bCorner = Instance.new("UICorner")
+    bCorner.CornerRadius = UDim.new(0, 6)
+    bCorner.Parent = btn
+
+    btn.MouseButton1Click:Connect(callback)
 end
 
 -- Initialize Pages
 local aimPage = createPage("Aim")
 local visualsPage = createPage("Visuals")
-local miscPage = createPage("Misc")
+local gunPage = createPage("Gun Mods")
+local miscPage = createPage("Misc & Config")
 
 local aimTab = addTab("Aim", "🎯")
 local visualsTab = addTab("Visuals", "👁️")
-local miscTab = addTab("Misc", "⚙️")
+local gunTab = addTab("Gun Mods", "🔫")
+local miscTab = addTab("Misc & Config", "⚙️")
 
 -- Build Aim Page
 addToggle(aimPage, "Aimbot Lock", aimbotEnabled, function(s) aimbotEnabled = s end)
@@ -340,9 +371,13 @@ addClicker(aimPage, "Lead Prediction", tostring(leadFactor) .. "x", function()
 end)
 
 -- Build Visuals Page
-addToggle(visualsPage, "Player ESP (เรืองแสง/กล่อง)", espEnabled, function(s) espEnabled = s end)
+addToggle(visualsPage, "Player ESP (เรืองแสง/กล่อง/ระยะ)", espEnabled, function(s) espEnabled = s end)
+addToggle(visualsPage, "Inspect Target (ดูของในตัวศัตรู)", inspectEnabled, function(s) inspectEnabled = s end)
 
--- Build Misc Page
+-- Build Gun Mods Page
+addToggle(gunPage, "No Recoil / Anti-Camera Shake (ช่วยคุมปืน)", recoilControlEnabled, function(s) recoilControlEnabled = s end)
+
+-- Build Misc & Config Page
 addToggle(miscPage, "ขยาย Hitbox หัวจริง", hitboxExpanded, function(s) 
     hitboxExpanded = s 
     if not hitboxExpanded then
@@ -362,10 +397,103 @@ addClicker(miscPage, "ขนาด Hitbox (studs)", tostring(hitboxSize) .. " st
 end)
 addToggle(miscPage, "Instant Pickup (เก็บของไว)", instantPickupEnabled, function(s) instantPickupEnabled = s end)
 
--- Default Tab View
+-- Config Save/Load System
+addButton(miscPage, "💾 บันทึกตั้งค่า (Save Config)", function()
+    local cfg = {
+        espEnabled = espEnabled,
+        inspectEnabled = inspectEnabled,
+        teamCheckEnabled = teamCheckEnabled,
+        aimbotEnabled = aimbotEnabled,
+        wallCheckEnabled = wallCheckEnabled,
+        fovEnabled = fovEnabled,
+        instantPickupEnabled = instantPickupEnabled,
+        hitboxExpanded = hitboxExpanded,
+        recoilControlEnabled = recoilControlEnabled,
+        hitboxSize = hitboxSize,
+        aimSmoothness = aimSmoothness,
+        fovRadius = fovRadius,
+        targetPartName = targetPartName,
+        leadFactor = leadFactor
+    }
+    if writefile then
+        writefile(configFileName, HttpService:JSONEncode(cfg))
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Syrex Hub", Text = "บันทึกการตั้งค่าสำเร็จ!", Duration = 3})
+    end
+end)
+
+addButton(miscPage, "📂 โหลดตั้งค่า (Load Config)", function()
+    if readfile and isfile and isfile(configFileName) then
+        local success, result = pcall(function()
+            return HttpService:JSONDecode(readfile(configFileName))
+        end)
+        if success and result then
+            espEnabled = result.espEnabled or false
+            inspectEnabled = result.inspectEnabled or false
+            teamCheckEnabled = result.teamCheckEnabled or false
+            aimbotEnabled = result.aimbotEnabled or false
+            wallCheckEnabled = result.wallCheckEnabled or false
+            fovEnabled = result.fovEnabled or false
+            instantPickupEnabled = result.instantPickupEnabled or false
+            hitboxExpanded = result.hitboxExpanded or false
+            recoilControlEnabled = result.recoilControlEnabled or false
+            hitboxSize = result.hitboxSize or 7
+            aimSmoothness = result.aimSmoothness or 0.25
+            fovRadius = result.fovRadius or 140
+            targetPartName = result.targetPartName or "Head"
+            leadFactor = result.leadFactor or 1.0
+            game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Syrex Hub", Text = "โหลดการตั้งค่าสำเร็จ!", Duration = 3})
+        end
+    end
+end)
+
+-- Default Tab
 aimPage.Visible = true
 aimTab.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 aimTab.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- 4. RIGHT CTRL HOTKEY (ย่อ/เปิด/ปิด UI)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end)
+
+-- 5. INSPECT PANEL (พาเนลดูชุด/ไอเทมศัตรู)
+local InspectFrame = Instance.new("Frame")
+InspectFrame.Name = "InspectFrame"
+InspectFrame.Parent = ScreenGui
+InspectFrame.Size = UDim2.new(0, 200, 0, 110)
+InspectFrame.Position = UDim2.new(0.02, 0, 0.7, 0)
+InspectFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+InspectFrame.BorderSizePixel = 0
+InspectFrame.Visible = false
+
+local insCorner = Instance.new("UICorner")
+insCorner.CornerRadius = UDim.new(0, 6)
+insCorner.Parent = InspectFrame
+
+local InsTitle = Instance.new("TextLabel")
+InsTitle.Parent = InspectFrame
+InsTitle.Size = UDim2.new(1, -10, 0, 22)
+InsTitle.Position = UDim2.new(0, 10, 0, 4)
+InsTitle.BackgroundTransparency = 1
+InsTitle.Text = "INSPECT TARGET"
+InsTitle.TextColor3 = Color3.fromRGB(0, 220, 255)
+InsTitle.TextSize = 11
+InsTitle.Font = Enum.Font.GothamBold
+InsTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+local InsContent = Instance.new("TextLabel")
+InsContent.Parent = InspectFrame
+InsContent.Size = UDim2.new(1, -16, 1, -30)
+InsContent.Position = UDim2.new(0, 10, 0, 26)
+InsContent.BackgroundTransparency = 1
+InsContent.Text = "No Target"
+InsContent.TextColor3 = Color3.fromRGB(220, 220, 230)
+InsContent.TextSize = 11
+InsContent.Font = Enum.Font.Gotham
+InsContent.TextXAlignment = Enum.TextXAlignment.Left
+InsContent.TextYAlignment = Enum.TextYAlignment.Top
 
 -- FOV Circle Drawing Frame
 local fovFrame = Instance.new("Frame")
@@ -385,7 +513,7 @@ local fovCorner = Instance.new("UICorner")
 fovCorner.Parent = fovFrame
 fovCorner.CornerRadius = UDim.new(1, 0)
 
--- Core Game Logic Helpers
+-- Helper Functions
 local function getRootPart(character)
     if not character then return nil end
     return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head") or character.PrimaryPart
@@ -408,15 +536,12 @@ local function isVisible(targetPart)
     local direction = targetPart.Position - origin
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    
     local ignoreList = {Camera}
     if LocalPlayer.Character then table.insert(ignoreList, LocalPlayer.Character) end
     raycastParams.FilterDescendantsInstances = ignoreList
 
     local result = workspace:Raycast(origin, direction, raycastParams)
-    if result then
-        return result.Instance:IsDescendantOf(targetPart.Parent)
-    end
+    if result then return result.Instance:IsDescendantOf(targetPart.Parent) end
     return true
 end
 
@@ -494,7 +619,7 @@ end
 for _, p in pairs(Players:GetPlayers()) do applyESP(p) end
 Players.PlayerAdded:Connect(applyESP)
 
--- Fast Update Loops
+-- Fast Update Loop
 task.spawn(function()
     while true do
         task.wait(0.1)
@@ -576,6 +701,11 @@ RunService.RenderStepped:Connect(function()
     fovFrame.Size = UDim2.new(0, fovRadius * 2, 0, fovRadius * 2)
     fovFrame.Visible = fovEnabled
 
+    -- No Recoil / Anti-Camera Shake Logic
+    if recoilControlEnabled then
+        Camera.RotVelocity = Vector3.new(0, 0, 0)
+    end
+
     local isHolding = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
 
     if aimbotEnabled and isHolding then
@@ -609,6 +739,30 @@ RunService.RenderStepped:Connect(function()
         end
     else
         stickyTarget = nil
+    end
+
+    -- Update Inspect Panel Logic
+    if inspectEnabled then
+        local tPlayer = stickyTarget or getClosestPlayerToMouse()
+        if tPlayer and tPlayer.Character then
+            InspectFrame.Visible = true
+            local tool = tPlayer.Character:FindFirstChildOfClass("Tool")
+            local toolName = tool and tool.Name or "Hands (มือเปล่า)"
+            
+            local backpackItems = {}
+            if tPlayer:FindFirstChild("Backpack") then
+                for _, item in pairs(tPlayer.Backpack:GetChildren()) do
+                    table.insert(backpackItems, item.Name)
+                end
+            end
+            local backpackStr = #backpackItems > 0 and table.concat(backpackItems, ", ") or "None"
+            
+            InsContent.Text = "Target: " .. tPlayer.Name .. "\nEquipped: " .. toolName .. "\nBackpack: " .. backpackStr
+        else
+            InspectFrame.Visible = false
+        end
+    else
+        InspectFrame.Visible = false
     end
 end)
 
