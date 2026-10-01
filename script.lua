@@ -1,4 +1,4 @@
--- Syrex Hub Ultimate V29 (Inspect + Gun Mods + Config System + Toggle Key)
+-- Syrex Hub Ultimate V30 (Fixed Aim + Realtime Target Gear HUD)
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
@@ -13,9 +13,10 @@ local Camera = workspace.CurrentCamera
 -- Config Values
 local espEnabled = true
 local inspectEnabled = true
+local gearHudEnabled = true -- ระบบโชว์ไอเทมเรียลไทม์ใต้ตัวศัตรู
 local teamCheckEnabled = false
-local aimbotEnabled = false
-local wallCheckEnabled = true
+local aimbotEnabled = true
+local wallCheckEnabled = false -- ปิดไว้เป็นค่าเริ่มต้นเพื่อป้องกันปัญหาล็อคไม่ได้
 local fovEnabled = true
 local instantPickupEnabled = false
 local hitboxExpanded = false
@@ -25,7 +26,6 @@ local recoilControlEnabled = true
 local hitboxSizes = {4, 7, 10, 15}
 local currentHitboxIndex = 2
 local hitboxSize = hitboxSizes[currentHitboxIndex]
-local hitboxTransparency = 0.5
 
 local aimModes = {"Smooth Cam", "Hard Lock", "Mouse Delta"}
 local currentAimModeIndex = 1
@@ -39,12 +39,12 @@ local fovRadius = 140
 local fovSizes = {60, 100, 140, 180, 240, 300}
 local currentFovIndex = 3
 
-local targetParts = {"Head", "Neck", "HumanoidRootPart"}
+local targetParts = {"Head", "HumanoidRootPart"}
 local currentTargetIndex = 1
 local targetPartName = targetParts[currentTargetIndex]
 
 local leadMultipliers = {0, 0.5, 1.0, 1.5, 2.0}
-local currentLeadIndex = 3
+local currentLeadIndex = 1
 local leadFactor = leadMultipliers[currentLeadIndex]
 
 local stickyTarget = nil
@@ -52,13 +52,13 @@ local configFileName = "SyrexHub_Config.json"
 
 -- Clean Old UI
 local parentGui = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
-if parentGui:FindFirstChild("SyrexHub_v29") then
-    parentGui:FindFirstChild("SyrexHub_v29"):Destroy()
+if parentGui:FindFirstChild("SyrexHub_v30") then
+    parentGui:FindFirstChild("SyrexHub_v30"):Destroy()
 end
 
 -- ScreenGui Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SyrexHub_v29"
+ScreenGui.Name = "SyrexHub_v30"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = parentGui
 
@@ -105,7 +105,7 @@ SubTitle.Parent = HubTitle
 SubTitle.Size = UDim2.new(1, 0, 0, 15)
 SubTitle.Position = UDim2.new(0, 0, 0, 22)
 SubTitle.BackgroundTransparency = 1
-SubTitle.Text = "v29 • [Right-Ctrl Toggle]"
+SubTitle.Text = "v30 • [Right-Ctrl Toggle]"
 SubTitle.TextColor3 = Color3.fromRGB(120, 120, 130)
 SubTitle.TextSize = 10
 SubTitle.Font = Enum.Font.Gotham
@@ -188,7 +188,7 @@ local function addTab(name, icon)
     return btn
 end
 
--- Custom UI Controls Component
+-- Custom UI Controls
 local function addToggle(page, labelText, defaultState, callback)
     local container = Instance.new("Frame")
     container.Parent = page
@@ -214,7 +214,7 @@ local function addToggle(page, labelText, defaultState, callback)
     switchBg.Parent = container
     switchBg.Position = UDim2.new(1, -50, 0.5, -10)
     switchBg.Size = UDim2.new(0, 38, 0, 20)
-    switchBg.BackgroundColor3 = defaultState and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(50, 50, 60)
+    switchBg.BackgroundColor3 = defaultState and Color3.fromRGB(0, 220, 255) or Color3.fromRGB(50, 50, 60)
 
     local swCorner = Instance.new("UICorner")
     swCorner.CornerRadius = UDim.new(1, 0)
@@ -239,7 +239,7 @@ local function addToggle(page, labelText, defaultState, callback)
 
     local function updateVisuals(st)
         if st then
-            TweenService:Create(switchBg, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 255, 255)}):Play()
+            TweenService:Create(switchBg, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(0, 220, 255)}):Play()
             TweenService:Create(dot, TweenInfo.new(0.15), {Position = UDim2.new(1, -18, 0.5, -7), BackgroundColor3 = Color3.fromRGB(15, 15, 20)}):Play()
         else
             TweenService:Create(switchBg, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}):Play()
@@ -335,10 +335,10 @@ local gunTab = addTab("Gun Mods", "🔫")
 local miscTab = addTab("Misc & Config", "⚙️")
 
 -- Build Aim Page
-addToggle(aimPage, "Aimbot Lock", aimbotEnabled, function(s) aimbotEnabled = s end)
+addToggle(aimPage, "Aimbot Lock (คลิกขวาถือล็อก)", aimbotEnabled, function(s) aimbotEnabled = s end)
 addToggle(aimPage, "Wall Check (ไม่ยิงทะลุกำแพง)", wallCheckEnabled, function(s) wallCheckEnabled = s end)
 addToggle(aimPage, "Team Check (ไม่ล็อกพวกเดียวกัน)", teamCheckEnabled, function(s) teamCheckEnabled = s end)
-addClicker(aimPage, "Target Part", "Head", function()
+addClicker(aimPage, "Target Part", targetPartName, function()
     currentTargetIndex = currentTargetIndex + 1
     if currentTargetIndex > #targetParts then currentTargetIndex = 1 end
     targetPartName = targetParts[currentTargetIndex]
@@ -363,16 +363,11 @@ addClicker(aimPage, "FOV Radius (px)", tostring(fovRadius) .. " px", function()
     fovRadius = fovSizes[currentFovIndex]
     return tostring(fovRadius) .. " px"
 end)
-addClicker(aimPage, "Lead Prediction", tostring(leadFactor) .. "x", function()
-    currentLeadIndex = currentLeadIndex + 1
-    if currentLeadIndex > #leadMultipliers then currentLeadIndex = 1 end
-    leadFactor = leadMultipliers[currentLeadIndex]
-    return tostring(leadFactor) .. "x"
-end)
 
 -- Build Visuals Page
-addToggle(visualsPage, "Player ESP (เรืองแสง/กล่อง/ระยะ)", espEnabled, function(s) espEnabled = s end)
-addToggle(visualsPage, "Inspect Target (ดูของในตัวศัตรู)", inspectEnabled, function(s) inspectEnabled = s end)
+addToggle(visualsPage, "Player ESP (กล่อง/ระยะ)", espEnabled, function(s) espEnabled = s end)
+addToggle(visualsPage, "Target Gear HUD (โชว์ของใต้ตัวศัตรูแบบภาพ)", gearHudEnabled, function(s) gearHudEnabled = s end)
+addToggle(visualsPage, "Inspect Panel (หน้าต่างพาเนลสรุปของ)", inspectEnabled, function(s) inspectEnabled = s end)
 
 -- Build Gun Mods Page
 addToggle(gunPage, "No Recoil / Anti-Camera Shake (ช่วยคุมปืน)", recoilControlEnabled, function(s) recoilControlEnabled = s end)
@@ -397,11 +392,12 @@ addClicker(miscPage, "ขนาด Hitbox (studs)", tostring(hitboxSize) .. " st
 end)
 addToggle(miscPage, "Instant Pickup (เก็บของไว)", instantPickupEnabled, function(s) instantPickupEnabled = s end)
 
--- Config Save/Load System
+-- Config System
 addButton(miscPage, "💾 บันทึกตั้งค่า (Save Config)", function()
     local cfg = {
         espEnabled = espEnabled,
         inspectEnabled = inspectEnabled,
+        gearHudEnabled = gearHudEnabled,
         teamCheckEnabled = teamCheckEnabled,
         aimbotEnabled = aimbotEnabled,
         wallCheckEnabled = wallCheckEnabled,
@@ -412,8 +408,7 @@ addButton(miscPage, "💾 บันทึกตั้งค่า (Save Config)"
         hitboxSize = hitboxSize,
         aimSmoothness = aimSmoothness,
         fovRadius = fovRadius,
-        targetPartName = targetPartName,
-        leadFactor = leadFactor
+        targetPartName = targetPartName
     }
     if writefile then
         writefile(configFileName, HttpService:JSONEncode(cfg))
@@ -424,11 +419,12 @@ end)
 addButton(miscPage, "📂 โหลดตั้งค่า (Load Config)", function()
     if readfile and isfile and isfile(configFileName) then
         local success, result = pcall(function()
-            return HttpService:JSONDecode(readfile(configFileName))
+            return HttpService:JSONEncode(readfile(configFileName))
         end)
         if success and result then
             espEnabled = result.espEnabled or false
             inspectEnabled = result.inspectEnabled or false
+            gearHudEnabled = result.gearHudEnabled or false
             teamCheckEnabled = result.teamCheckEnabled or false
             aimbotEnabled = result.aimbotEnabled or false
             wallCheckEnabled = result.wallCheckEnabled or false
@@ -440,7 +436,6 @@ addButton(miscPage, "📂 โหลดตั้งค่า (Load Config)", func
             aimSmoothness = result.aimSmoothness or 0.25
             fovRadius = result.fovRadius or 140
             targetPartName = result.targetPartName or "Head"
-            leadFactor = result.leadFactor or 1.0
             game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Syrex Hub", Text = "โหลดการตั้งค่าสำเร็จ!", Duration = 3})
         end
     end
@@ -451,51 +446,14 @@ aimPage.Visible = true
 aimTab.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 aimTab.TextColor3 = Color3.fromRGB(255, 255, 255)
 
--- 4. RIGHT CTRL HOTKEY (ย่อ/เปิด/ปิด UI)
+-- RIGHT CTRL HOTKEY
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
         MainFrame.Visible = not MainFrame.Visible
     end
 end)
 
--- 5. INSPECT PANEL (พาเนลดูชุด/ไอเทมศัตรู)
-local InspectFrame = Instance.new("Frame")
-InspectFrame.Name = "InspectFrame"
-InspectFrame.Parent = ScreenGui
-InspectFrame.Size = UDim2.new(0, 200, 0, 110)
-InspectFrame.Position = UDim2.new(0.02, 0, 0.7, 0)
-InspectFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
-InspectFrame.BorderSizePixel = 0
-InspectFrame.Visible = false
-
-local insCorner = Instance.new("UICorner")
-insCorner.CornerRadius = UDim.new(0, 6)
-insCorner.Parent = InspectFrame
-
-local InsTitle = Instance.new("TextLabel")
-InsTitle.Parent = InspectFrame
-InsTitle.Size = UDim2.new(1, -10, 0, 22)
-InsTitle.Position = UDim2.new(0, 10, 0, 4)
-InsTitle.BackgroundTransparency = 1
-InsTitle.Text = "INSPECT TARGET"
-InsTitle.TextColor3 = Color3.fromRGB(0, 220, 255)
-InsTitle.TextSize = 11
-InsTitle.Font = Enum.Font.GothamBold
-InsTitle.TextXAlignment = Enum.TextXAlignment.Left
-
-local InsContent = Instance.new("TextLabel")
-InsContent.Parent = InspectFrame
-InsContent.Size = UDim2.new(1, -16, 1, -30)
-InsContent.Position = UDim2.new(0, 10, 0, 26)
-InsContent.BackgroundTransparency = 1
-InsContent.Text = "No Target"
-InsContent.TextColor3 = Color3.fromRGB(220, 220, 230)
-InsContent.TextSize = 11
-InsContent.Font = Enum.Font.Gotham
-InsContent.TextXAlignment = Enum.TextXAlignment.Left
-InsContent.TextYAlignment = Enum.TextYAlignment.Top
-
--- FOV Circle Drawing Frame
+-- FOV Circle
 local fovFrame = Instance.new("Frame")
 fovFrame.Parent = ScreenGui
 fovFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -506,12 +464,84 @@ fovFrame.Visible = false
 
 local fovStroke = Instance.new("UIStroke")
 fovStroke.Parent = fovFrame
-fovStroke.Color = Color3.fromRGB(255, 255, 255)
+fovStroke.Color = Color3.fromRGB(0, 220, 255)
 fovStroke.Thickness = 1.5
 
 local fovCorner = Instance.new("UICorner")
 fovCorner.Parent = fovFrame
 fovCorner.CornerRadius = UDim.new(1, 0)
+
+-- TARGET GEAR BILLBOARD CREATOR (แสดงไอเทม 3 ช่องเรียลไทม์ใต้ตัวศัตรู)
+local function createTargetGearHUD(character)
+    if not character then return end
+    local rootPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head")
+    if not rootPart then return end
+
+    if rootPart:FindFirstChild("TargetGearHUD") then
+        rootPart.TargetGearHUD:Destroy()
+    end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "TargetGearHUD"
+    billboard.Adornee = rootPart
+    billboard.Size = UDim2.new(0, 160, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, -3.8, 0) -- ตำแหน่งใต้เท้า/ใต้กล่อง ESP
+    billboard.AlwaysOnTop = true
+    billboard.Enabled = false
+    billboard.Parent = rootPart
+
+    local container = Instance.new("Frame")
+    container.Parent = billboard
+    container.Size = UDim2.new(1, 0, 1, 0)
+    container.BackgroundTransparency = 1
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.Parent = container
+    listLayout.FillDirection = Enum.FillDirection.Horizontal
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    listLayout.Padding = UDim.new(0, 6)
+
+    -- สร้างกล่องไอเทม 3 ช่อง
+    for i = 1, 3 do
+        local slot = Instance.new("Frame")
+        slot.Name = "Slot" .. tostring(i)
+        slot.Parent = container
+        slot.Size = UDim2.new(0, 44, 0, 44)
+        slot.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
+        slot.BackgroundTransparency = 0.3
+
+        local slotCorner = Instance.new("UICorner")
+        slotCorner.CornerRadius = UDim.new(0, 8)
+        slotCorner.Parent = slot
+
+        local slotStroke = Instance.new("UIStroke")
+        slotStroke.Parent = slot
+        slotStroke.Color = Color3.fromRGB(80, 70, 60)
+        slotStroke.Thickness = 1
+
+        local iconImg = Instance.new("ImageLabel")
+        iconImg.Name = "Icon"
+        iconImg.Parent = slot
+        iconImg.Size = UDim2.new(0, 32, 0, 32)
+        iconImg.Position = UDim2.new(0.5, -16, 0.5, -16)
+        iconImg.BackgroundTransparency = 1
+        iconImg.Visible = false
+
+        local nameTxt = Instance.new("TextLabel")
+        nameTxt.Name = "ItemName"
+        nameTxt.Parent = slot
+        nameTxt.Size = UDim2.new(1, -4, 1, -4)
+        nameTxt.Position = UDim2.new(0, 2, 0, 2)
+        nameTxt.BackgroundTransparency = 1
+        nameTxt.Text = ""
+        nameTxt.TextColor3 = Color3.fromRGB(240, 220, 200)
+        nameTxt.TextSize = 9
+        nameTxt.Font = Enum.Font.GothamBold
+        nameTxt.TextWrapped = true
+    end
+
+    return billboard
+end
 
 -- Helper Functions
 local function getRootPart(character)
@@ -550,10 +580,10 @@ local function isValidTarget(player)
     if not isEnemy(player) then return false end
     local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
     local targetPart = getTargetPart(player.Character)
-    return humanoid and humanoid.Health > 0 and targetPart
+    return humanoid and humanoid.Health > 0 and targetPart ~= nil
 end
 
--- ESP Attach Logic
+-- Setup ESP and Gear HUD on players
 local function applyESP(player)
     if player == LocalPlayer then return end
 
@@ -566,7 +596,7 @@ local function applyESP(player)
         highlight.Name = "ESPHighlight"
         highlight.Adornee = char
         highlight.FillColor = Color3.fromRGB(255, 50, 50)
-        highlight.FillTransparency = 0.5
+        highlight.FillTransparency = 0.6
         highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
         highlight.Enabled = espEnabled and isEnemy(player)
         highlight.Parent = char
@@ -576,7 +606,7 @@ local function applyESP(player)
         bgui.Name = "ESPBillboard"
         bgui.Adornee = rootPart
         bgui.Size = UDim2.new(0, 180, 0, 25)
-        bgui.StudsOffset = Vector3.new(0, 3.5, 0)
+        bgui.StudsOffset = Vector3.new(0, 3.2, 0)
         bgui.AlwaysOnTop = true
         bgui.Enabled = espEnabled and isEnemy(player)
         bgui.Parent = rootPart
@@ -592,24 +622,7 @@ local function applyESP(player)
         txt.TextSize = 12
         txt.Font = Enum.Font.GothamBold
 
-        if rootPart:FindFirstChild("BoxESPBillboard") then rootPart.BoxESPBillboard:Destroy() end
-        local boxGui = Instance.new("BillboardGui")
-        boxGui.Name = "BoxESPBillboard"
-        boxGui.Adornee = rootPart
-        boxGui.Size = UDim2.new(4.5, 0, 6, 0)
-        boxGui.AlwaysOnTop = true
-        boxGui.Enabled = espEnabled and isEnemy(player)
-        boxGui.Parent = rootPart
-
-        local boxFrame = Instance.new("Frame")
-        boxFrame.Parent = boxGui
-        boxFrame.Size = UDim2.new(1, 0, 1, 0)
-        boxFrame.BackgroundTransparency = 1
-
-        local stroke = Instance.new("UIStroke")
-        stroke.Parent = boxFrame
-        stroke.Color = Color3.fromRGB(0, 220, 255)
-        stroke.Thickness = 1.5
+        createTargetGearHUD(char)
     end
 
     if player.Character then task.spawn(setupChar, player.Character) end
@@ -619,38 +632,66 @@ end
 for _, p in pairs(Players:GetPlayers()) do applyESP(p) end
 Players.PlayerAdded:Connect(applyESP)
 
--- Fast Update Loop
+-- Fast Realtime Gear Update & ESP Loop
 task.spawn(function()
     while true do
-        task.wait(0.1)
-        if LocalPlayer.Character then
-            local myRoot = getRootPart(LocalPlayer.Character)
-            if myRoot then
-                for _, player in pairs(Players:GetPlayers()) do
-                    if player ~= LocalPlayer and player.Character then
-                        local targetRoot = getRootPart(player.Character)
-                        if targetRoot then
-                            local bgui = targetRoot:FindFirstChild("ESPBillboard")
-                            local boxGui = targetRoot:FindFirstChild("BoxESPBillboard")
-                            local highlight = player.Character:FindFirstChild("ESPHighlight")
-                            local shouldShow = espEnabled and isEnemy(player)
+        task.wait(0.08)
+        pcall(function()
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer and player.Character then
+                    local targetRoot = getRootPart(player.Character)
+                    if targetRoot then
+                        local gearHud = targetRoot:FindFirstChild("TargetGearHUD")
+                        local shouldShowGear = gearHudEnabled and isEnemy(player)
 
-                            if bgui then bgui.Enabled = shouldShow end
-                            if boxGui then boxGui.Enabled = shouldShow end
-                            if highlight then highlight.Enabled = shouldShow end
+                        if gearHud then
+                            gearHud.Enabled = shouldShowGear
+                            if shouldShowGear then
+                                local itemsList = {}
+                                local tool = player.Character:FindFirstChildOfClass("Tool")
+                                if tool then table.insert(itemsList, tool) end
 
-                            if shouldShow and bgui then
-                                local txt = bgui:FindFirstChild("ESPText")
-                                if txt then
-                                    local dist = math.floor((myRoot.Position - targetRoot.Position).Magnitude)
-                                    txt.Text = "[ " .. player.Name .. " ] [" .. tostring(dist) .. "m]"
+                                if player:FindFirstChild("Backpack") then
+                                    for _, bItem in pairs(player.Backpack:GetChildren()) do
+                                        if bItem:IsA("Tool") and #itemsList < 3 then
+                                            table.insert(itemsList, bItem)
+                                        end
+                                    end
+                                end
+
+                                local container = gearHud:FindFirstChild("Frame")
+                                if container then
+                                    for i = 1, 3 do
+                                        local slot = container:FindFirstChild("Slot" .. tostring(i))
+                                        if slot then
+                                            local item = itemsList[i]
+                                            local iconImg = slot:FindFirstChild("Icon")
+                                            local nameTxt = slot:FindFirstChild("ItemName")
+
+                                            if item then
+                                                if item.TextureId ~= "" and iconImg then
+                                                    iconImg.Image = item.TextureId
+                                                    iconImg.Visible = true
+                                                    if nameTxt then nameTxt.Text = "" end
+                                                elseif nameTxt then
+                                                    if iconImg then iconImg.Visible = false end
+                                                    nameTxt.Text = string.sub(item.Name, 1, 10)
+                                                end
+                                                slot.BackgroundTransparency = 0.2
+                                            else
+                                                if iconImg then iconImg.Visible = false end
+                                                if nameTxt then nameTxt.Text = "-" end
+                                                slot.BackgroundTransparency = 0.6
+                                            end
+                                        end
+                                    end
                                 end
                             end
                         end
                     end
                 end
             end
-        end
+        end)
     end
 end)
 
@@ -663,9 +704,8 @@ RunService.Heartbeat:Connect(function()
                     local head = player.Character:FindFirstChild("Head")
                     if head and isEnemy(player) then
                         head.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-                        head.Transparency = hitboxTransparency
+                        head.Transparency = 0.5
                         head.CanCollide = false
-                        head.Massless = true
                     end
                 end
             end
@@ -673,10 +713,10 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Aim & Render Loop
+-- AIMBOT ENGINE (FIXED V30)
 local function getClosestPlayerToMouse()
     local closestPlayer = nil
-    local shortestDistance = fovEnabled and fovRadius or 999999
+    local shortestDistance = fovEnabled and fovRadius or 99999
     local mousePos = UserInputService:GetMouseLocation()
 
     for _, player in pairs(Players:GetPlayers()) do
@@ -697,19 +737,21 @@ local function getClosestPlayerToMouse()
     return closestPlayer
 end
 
+-- RenderStepped Aimbot Loop
 RunService.RenderStepped:Connect(function()
     fovFrame.Size = UDim2.new(0, fovRadius * 2, 0, fovRadius * 2)
     fovFrame.Visible = fovEnabled
 
-    -- No Recoil / Anti-Camera Shake Logic
+    -- No Recoil Camera Lock
     if recoilControlEnabled then
         Camera.RotVelocity = Vector3.new(0, 0, 0)
     end
 
-    local isHolding = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+    -- ตรวจจับคลิกขวา (MouseButton2) หรือคลิกซ้าย (MouseButton1)
+    local isHoldingAim = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
 
-    if aimbotEnabled and isHolding then
-        if not stickyTarget or not isValidTarget(stickyTarget) or not isVisible(getTargetPart(stickyTarget.Character)) then
+    if aimbotEnabled and isHoldingAim then
+        if not stickyTarget or not isValidTarget(stickyTarget) then
             stickyTarget = getClosestPlayerToMouse()
         end
 
@@ -717,52 +759,28 @@ RunService.RenderStepped:Connect(function()
             local targetPart = getTargetPart(stickyTarget.Character)
             if targetPart then
                 local targetPos = targetPart.Position
-                local velocity = targetPart.AssemblyLinearVelocity or targetPart.Velocity or Vector3.new(0,0,0)
-                local distance = (targetPos - Camera.CFrame.Position).Magnitude
-                local timeToHit = (distance / 2500) * leadFactor
-                local predictedPos = targetPos + (velocity * timeToHit)
-
+                
                 if aimMode == "Smooth Cam" then
-                    Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, predictedPos), aimSmoothness)
+                    Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetPos), aimSmoothness)
                 elseif aimMode == "Hard Lock" then
-                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, predictedPos)
+                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPos)
                 elseif aimMode == "Mouse Delta" then
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(predictedPos)
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(targetPos)
                     if onScreen then
                         local mousePos = UserInputService:GetMouseLocation()
                         local deltaX = (screenPos.X - mousePos.X) * aimSmoothness
                         local deltaY = (screenPos.Y - mousePos.Y) * aimSmoothness
-                        if mousemoverel then mousemoverel(deltaX, deltaY) else Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, predictedPos), aimSmoothness) end
+                        if mousemoverel then
+                            mousemoverel(deltaX, deltaY)
+                        else
+                            Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetPos), aimSmoothness)
+                        end
                     end
                 end
             end
         end
     else
         stickyTarget = nil
-    end
-
-    -- Update Inspect Panel Logic
-    if inspectEnabled then
-        local tPlayer = stickyTarget or getClosestPlayerToMouse()
-        if tPlayer and tPlayer.Character then
-            InspectFrame.Visible = true
-            local tool = tPlayer.Character:FindFirstChildOfClass("Tool")
-            local toolName = tool and tool.Name or "Hands (มือเปล่า)"
-            
-            local backpackItems = {}
-            if tPlayer:FindFirstChild("Backpack") then
-                for _, item in pairs(tPlayer.Backpack:GetChildren()) do
-                    table.insert(backpackItems, item.Name)
-                end
-            end
-            local backpackStr = #backpackItems > 0 and table.concat(backpackItems, ", ") or "None"
-            
-            InsContent.Text = "Target: " .. tPlayer.Name .. "\nEquipped: " .. toolName .. "\nBackpack: " .. backpackStr
-        else
-            InspectFrame.Visible = false
-        end
-    else
-        InspectFrame.Visible = false
     end
 end)
 
