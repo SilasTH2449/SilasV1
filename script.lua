@@ -1,64 +1,63 @@
--- Syrex Hub Ultimate V30 (Fixed Aim + Realtime Target Gear HUD)
+-- Syrex Hub Ultimate V34 (Universal Item Scanner + Hard-Lock Aim Engine)
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ProximityPromptService = game:GetService("ProximityPromptService")
 local TweenService = game:GetService("TweenService")
-local HttpService = game:GetService("HttpService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 -- Config Values
 local espEnabled = true
-local inspectEnabled = true
-local gearHudEnabled = true -- ระบบโชว์ไอเทมเรียลไทม์ใต้ตัวศัตรู
+local espBoxEnabled = true
+local gearHudEnabled = true
 local teamCheckEnabled = false
 local aimbotEnabled = true
-local wallCheckEnabled = false -- ปิดไว้เป็นค่าเริ่มต้นเพื่อป้องกันปัญหาล็อคไม่ได้
+local wallCheckEnabled = false
 local fovEnabled = true
 local instantPickupEnabled = false
-local hitboxExpanded = false
 local recoilControlEnabled = true
 
--- Settings Data
-local hitboxSizes = {4, 7, 10, 15}
-local currentHitboxIndex = 2
-local hitboxSize = hitboxSizes[currentHitboxIndex]
+-- Aim Settings
+local aimKeysList = {"Always On", "Right Click", "Left Click", "Left Shift", "E Key"}
+local currentAimKeyIndex = 1
+local selectedAimKey = aimKeysList[currentAimKeyIndex]
 
-local aimModes = {"Smooth Cam", "Hard Lock", "Mouse Delta"}
+local aimTriggersList = {"Hold", "Toggle"}
+local currentAimTriggerIndex = 1
+local selectedAimTrigger = aimTriggersList[currentAimTriggerIndex]
+
+local isAimingState = true
+
+local aimModes = {"Direct CFrame", "Smooth Cam", "Mouse Delta"}
 local currentAimModeIndex = 1
 local aimMode = aimModes[currentAimModeIndex]
 
-local smoothnessLevels = {0.1, 0.25, 0.5, 0.8, 1.0}
-local currentSmoothIndex = 2
+local smoothnessLevels = {0.15, 0.3, 0.5, 0.8, 1.0}
+local currentSmoothIndex = 3
 local aimSmoothness = smoothnessLevels[currentSmoothIndex]
 
-local fovRadius = 140
-local fovSizes = {60, 100, 140, 180, 240, 300}
+local fovRadius = 180
+local fovSizes = {80, 120, 160, 220, 300, 400}
 local currentFovIndex = 3
 
-local targetParts = {"Head", "HumanoidRootPart"}
+local targetParts = {"Head", "HumanoidRootPart", "UpperTorso"}
 local currentTargetIndex = 1
 local targetPartName = targetParts[currentTargetIndex]
 
-local leadMultipliers = {0, 0.5, 1.0, 1.5, 2.0}
-local currentLeadIndex = 1
-local leadFactor = leadMultipliers[currentLeadIndex]
-
 local stickyTarget = nil
-local configFileName = "SyrexHub_Config.json"
 
 -- Clean Old UI
 local parentGui = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
-if parentGui:FindFirstChild("SyrexHub_v30") then
-    parentGui:FindFirstChild("SyrexHub_v30"):Destroy()
+if parentGui:FindFirstChild("SyrexHub_v34") then
+    parentGui:FindFirstChild("SyrexHub_v34"):Destroy()
 end
 
 -- ScreenGui Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SyrexHub_v30"
+ScreenGui.Name = "SyrexHub_v34"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = parentGui
 
@@ -68,8 +67,8 @@ MainFrame.Name = "MainFrame"
 MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.3, 0, 0.22, 0)
-MainFrame.Size = UDim2.new(0, 580, 0, 410)
+MainFrame.Position = UDim2.new(0.3, 0, 0.2, 0)
+MainFrame.Size = UDim2.new(0, 560, 0, 420)
 MainFrame.Active = true
 MainFrame.Draggable = true
 
@@ -82,7 +81,7 @@ local Sidebar = Instance.new("Frame")
 Sidebar.Name = "Sidebar"
 Sidebar.Parent = MainFrame
 Sidebar.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
-Sidebar.Size = UDim2.new(0, 160, 1, 0)
+Sidebar.Size = UDim2.new(0, 150, 1, 0)
 Sidebar.BorderSizePixel = 0
 
 local sidebarCorner = Instance.new("UICorner")
@@ -96,16 +95,16 @@ HubTitle.Position = UDim2.new(0, 10, 0, 10)
 HubTitle.BackgroundTransparency = 1
 HubTitle.Text = "SYREX HUB"
 HubTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-HubTitle.TextSize = 16
+HubTitle.TextSize = 15
 HubTitle.Font = Enum.Font.GothamBold
 HubTitle.TextXAlignment = Enum.TextXAlignment.Left
 
 local SubTitle = Instance.new("TextLabel")
 SubTitle.Parent = HubTitle
 SubTitle.Size = UDim2.new(1, 0, 0, 15)
-SubTitle.Position = UDim2.new(0, 0, 0, 22)
+SubTitle.Position = UDim2.new(0, 0, 0, 20)
 SubTitle.BackgroundTransparency = 1
-SubTitle.Text = "v30 • [Right-Ctrl Toggle]"
+SubTitle.Text = "v34 • [Right-Ctrl]"
 SubTitle.TextColor3 = Color3.fromRGB(120, 120, 130)
 SubTitle.TextSize = 10
 SubTitle.Font = Enum.Font.Gotham
@@ -113,8 +112,8 @@ SubTitle.TextXAlignment = Enum.TextXAlignment.Left
 
 local TabList = Instance.new("Frame")
 TabList.Parent = Sidebar
-TabList.Position = UDim2.new(0, 10, 0, 65)
-TabList.Size = UDim2.new(1, -20, 1, -80)
+TabList.Position = UDim2.new(0, 10, 0, 60)
+TabList.Size = UDim2.new(1, -20, 1, -70)
 TabList.BackgroundTransparency = 1
 
 local tabLayout = Instance.new("UIListLayout")
@@ -126,8 +125,8 @@ tabLayout.Padding = UDim.new(0, 6)
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "ContentArea"
 ContentArea.Parent = MainFrame
-ContentArea.Position = UDim2.new(0, 170, 0, 10)
-ContentArea.Size = UDim2.new(1, -180, 1, -20)
+ContentArea.Position = UDim2.new(0, 160, 0, 10)
+ContentArea.Size = UDim2.new(1, -170, 1, -20)
 ContentArea.BackgroundTransparency = 1
 
 local pages = {}
@@ -163,7 +162,7 @@ local function addTab(name, icon)
     btn.BorderSizePixel = 0
     btn.Text = "   " .. icon .. "   " .. name
     btn.TextColor3 = Color3.fromRGB(180, 180, 190)
-    btn.TextSize = 12
+    btn.TextSize = 11
     btn.Font = Enum.Font.GothamMedium
     btn.TextXAlignment = Enum.TextXAlignment.Left
 
@@ -188,7 +187,7 @@ local function addTab(name, icon)
     return btn
 end
 
--- Custom UI Controls
+-- Controls
 local function addToggle(page, labelText, defaultState, callback)
     local container = Instance.new("Frame")
     container.Parent = page
@@ -206,14 +205,14 @@ local function addToggle(page, labelText, defaultState, callback)
     title.BackgroundTransparency = 1
     title.Text = labelText
     title.TextColor3 = Color3.fromRGB(220, 220, 230)
-    title.TextSize = 12
+    title.TextSize = 11
     title.Font = Enum.Font.Gotham
     title.TextXAlignment = Enum.TextXAlignment.Left
 
     local switchBg = Instance.new("Frame")
     switchBg.Parent = container
-    switchBg.Position = UDim2.new(1, -50, 0.5, -10)
-    switchBg.Size = UDim2.new(0, 38, 0, 20)
+    switchBg.Position = UDim2.new(1, -45, 0.5, -9)
+    switchBg.Size = UDim2.new(0, 34, 0, 18)
     switchBg.BackgroundColor3 = defaultState and Color3.fromRGB(0, 220, 255) or Color3.fromRGB(50, 50, 60)
 
     local swCorner = Instance.new("UICorner")
@@ -222,8 +221,8 @@ local function addToggle(page, labelText, defaultState, callback)
 
     local dot = Instance.new("Frame")
     dot.Parent = switchBg
-    dot.Position = defaultState and UDim2.new(1, -18, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
-    dot.Size = UDim2.new(0, 14, 0, 14)
+    dot.Position = defaultState and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 3, 0.5, -6)
+    dot.Size = UDim2.new(0, 12, 0, 12)
     dot.BackgroundColor3 = defaultState and Color3.fromRGB(15, 15, 20) or Color3.fromRGB(180, 180, 190)
 
     local dotCorner = Instance.new("UICorner")
@@ -240,10 +239,10 @@ local function addToggle(page, labelText, defaultState, callback)
     local function updateVisuals(st)
         if st then
             TweenService:Create(switchBg, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(0, 220, 255)}):Play()
-            TweenService:Create(dot, TweenInfo.new(0.15), {Position = UDim2.new(1, -18, 0.5, -7), BackgroundColor3 = Color3.fromRGB(15, 15, 20)}):Play()
+            TweenService:Create(dot, TweenInfo.new(0.15), {Position = UDim2.new(1, -15, 0.5, -6), BackgroundColor3 = Color3.fromRGB(15, 15, 20)}):Play()
         else
             TweenService:Create(switchBg, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(50, 50, 60)}):Play()
-            TweenService:Create(dot, TweenInfo.new(0.15), {Position = UDim2.new(0, 3, 0.5, -7), BackgroundColor3 = Color3.fromRGB(180, 180, 190)}):Play()
+            TweenService:Create(dot, TweenInfo.new(0.15), {Position = UDim2.new(0, 3, 0.5, -6), BackgroundColor3 = Color3.fromRGB(180, 180, 190)}):Play()
         end
     end
 
@@ -252,10 +251,6 @@ local function addToggle(page, labelText, defaultState, callback)
         updateVisuals(state)
         callback(state)
     end)
-    return function(newState)
-        state = newState
-        updateVisuals(state)
-    end
 end
 
 local function addClicker(page, labelText, defaultValText, callback)
@@ -275,18 +270,18 @@ local function addClicker(page, labelText, defaultValText, callback)
     title.BackgroundTransparency = 1
     title.Text = labelText
     title.TextColor3 = Color3.fromRGB(220, 220, 230)
-    title.TextSize = 12
+    title.TextSize = 11
     title.Font = Enum.Font.Gotham
     title.TextXAlignment = Enum.TextXAlignment.Left
 
     local valBox = Instance.new("TextLabel")
     valBox.Parent = container
-    valBox.Position = UDim2.new(1, -130, 0.5, -11)
-    valBox.Size = UDim2.new(0, 120, 0, 22)
+    valBox.Position = UDim2.new(1, -120, 0.5, -10)
+    valBox.Size = UDim2.new(0, 110, 0, 20)
     valBox.BackgroundColor3 = Color3.fromRGB(38, 38, 48)
     valBox.Text = defaultValText
     valBox.TextColor3 = Color3.fromRGB(0, 220, 255)
-    valBox.TextSize = 11
+    valBox.TextSize = 10
     valBox.Font = Enum.Font.GothamBold
 
     local vCorner = Instance.new("UICorner")
@@ -303,46 +298,25 @@ local function addClicker(page, labelText, defaultValText, callback)
         local newVal = callback()
         if newVal then valBox.Text = newVal end
     end)
-    return function(txt) valBox.Text = txt end
-end
-
-local function addButton(page, btnText, callback)
-    local btn = Instance.new("TextButton")
-    btn.Parent = page
-    btn.Size = UDim2.new(1, 0, 0, 36)
-    btn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-    btn.Text = btnText
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 12
-    btn.Font = Enum.Font.GothamBold
-
-    local bCorner = Instance.new("UICorner")
-    bCorner.CornerRadius = UDim.new(0, 6)
-    bCorner.Parent = btn
-
-    btn.MouseButton1Click:Connect(callback)
 end
 
 -- Initialize Pages
 local aimPage = createPage("Aim")
 local visualsPage = createPage("Visuals")
 local gunPage = createPage("Gun Mods")
-local miscPage = createPage("Misc & Config")
 
 local aimTab = addTab("Aim", "🎯")
 local visualsTab = addTab("Visuals", "👁️")
 local gunTab = addTab("Gun Mods", "🔫")
-local miscTab = addTab("Misc & Config", "⚙️")
 
 -- Build Aim Page
-addToggle(aimPage, "Aimbot Lock (คลิกขวาถือล็อก)", aimbotEnabled, function(s) aimbotEnabled = s end)
-addToggle(aimPage, "Wall Check (ไม่ยิงทะลุกำแพง)", wallCheckEnabled, function(s) wallCheckEnabled = s end)
-addToggle(aimPage, "Team Check (ไม่ล็อกพวกเดียวกัน)", teamCheckEnabled, function(s) teamCheckEnabled = s end)
-addClicker(aimPage, "Target Part", targetPartName, function()
-    currentTargetIndex = currentTargetIndex + 1
-    if currentTargetIndex > #targetParts then currentTargetIndex = 1 end
-    targetPartName = targetParts[currentTargetIndex]
-    return targetPartName
+addToggle(aimPage, "Aimbot Lock Master", aimbotEnabled, function(s) aimbotEnabled = s end)
+addClicker(aimPage, "Aim Key (ปุ่มเปิดล็อก)", selectedAimKey, function()
+    currentAimKeyIndex = currentAimKeyIndex + 1
+    if currentAimKeyIndex > #aimKeysList then currentAimKeyIndex = 1 end
+    selectedAimKey = aimKeysList[currentAimKeyIndex]
+    if selectedAimKey == "Always On" then isAimingState = true end
+    return selectedAimKey
 end)
 addClicker(aimPage, "Aim Mode", aimMode, function()
     currentAimModeIndex = currentAimModeIndex + 1
@@ -350,11 +324,19 @@ addClicker(aimPage, "Aim Mode", aimMode, function()
     aimMode = aimModes[currentAimModeIndex]
     return aimMode
 end)
-addClicker(aimPage, "Aim Speed / Smoothness", tostring(aimSmoothness), function()
+addClicker(aimPage, "Aim Smoothness", tostring(aimSmoothness), function()
     currentSmoothIndex = currentSmoothIndex + 1
     if currentSmoothIndex > #smoothnessLevels then currentSmoothIndex = 1 end
     aimSmoothness = smoothnessLevels[currentSmoothIndex]
     return tostring(aimSmoothness)
+end)
+addToggle(aimPage, "Wall Check (ไม่ยิงทะลุกำแพง)", wallCheckEnabled, function(s) wallCheckEnabled = s end)
+addToggle(aimPage, "Team Check (ไม่ล็อกพวกเดียวกัน)", teamCheckEnabled, function(s) teamCheckEnabled = s end)
+addClicker(aimPage, "Target Part", targetPartName, function()
+    currentTargetIndex = currentTargetIndex + 1
+    if currentTargetIndex > #targetParts then currentTargetIndex = 1 end
+    targetPartName = targetParts[currentTargetIndex]
+    return targetPartName
 end)
 addToggle(aimPage, "FOV Circle", fovEnabled, function(s) fovEnabled = s end)
 addClicker(aimPage, "FOV Radius (px)", tostring(fovRadius) .. " px", function()
@@ -365,91 +347,49 @@ addClicker(aimPage, "FOV Radius (px)", tostring(fovRadius) .. " px", function()
 end)
 
 -- Build Visuals Page
-addToggle(visualsPage, "Player ESP (กล่อง/ระยะ)", espEnabled, function(s) espEnabled = s end)
-addToggle(visualsPage, "Target Gear HUD (โชว์ของใต้ตัวศัตรูแบบภาพ)", gearHudEnabled, function(s) gearHudEnabled = s end)
-addToggle(visualsPage, "Inspect Panel (หน้าต่างพาเนลสรุปของ)", inspectEnabled, function(s) inspectEnabled = s end)
+addToggle(visualsPage, "Player ESP (ชื่อ/ระยะ)", espEnabled, function(s) espEnabled = s end)
+addToggle(visualsPage, "2D Box ESP (กรอบสี่เหลี่ยมรอบตัว)", espBoxEnabled, function(s) espBoxEnabled = s end)
+addToggle(visualsPage, "Compact Loadout HUD (ไอเทมศัตรู)", gearHudEnabled, function(s) gearHudEnabled = s end)
 
 -- Build Gun Mods Page
-addToggle(gunPage, "No Recoil / Anti-Camera Shake (ช่วยคุมปืน)", recoilControlEnabled, function(s) recoilControlEnabled = s end)
-
--- Build Misc & Config Page
-addToggle(miscPage, "ขยาย Hitbox หัวจริง", hitboxExpanded, function(s) 
-    hitboxExpanded = s 
-    if not hitboxExpanded then
-        for _, p in pairs(Players:GetPlayers()) do
-            if p.Character and p.Character:FindFirstChild("Head") then
-                p.Character.Head.Size = Vector3.new(1.2, 1.2, 1.2)
-                p.Character.Head.Transparency = 0
-            end
-        end
-    end
-end)
-addClicker(miscPage, "ขนาด Hitbox (studs)", tostring(hitboxSize) .. " studs", function()
-    currentHitboxIndex = currentHitboxIndex + 1
-    if currentHitboxIndex > #hitboxSizes then currentHitboxIndex = 1 end
-    hitboxSize = hitboxSizes[currentHitboxIndex]
-    return tostring(hitboxSize) .. " studs"
-end)
-addToggle(miscPage, "Instant Pickup (เก็บของไว)", instantPickupEnabled, function(s) instantPickupEnabled = s end)
-
--- Config System
-addButton(miscPage, "💾 บันทึกตั้งค่า (Save Config)", function()
-    local cfg = {
-        espEnabled = espEnabled,
-        inspectEnabled = inspectEnabled,
-        gearHudEnabled = gearHudEnabled,
-        teamCheckEnabled = teamCheckEnabled,
-        aimbotEnabled = aimbotEnabled,
-        wallCheckEnabled = wallCheckEnabled,
-        fovEnabled = fovEnabled,
-        instantPickupEnabled = instantPickupEnabled,
-        hitboxExpanded = hitboxExpanded,
-        recoilControlEnabled = recoilControlEnabled,
-        hitboxSize = hitboxSize,
-        aimSmoothness = aimSmoothness,
-        fovRadius = fovRadius,
-        targetPartName = targetPartName
-    }
-    if writefile then
-        writefile(configFileName, HttpService:JSONEncode(cfg))
-        game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Syrex Hub", Text = "บันทึกการตั้งค่าสำเร็จ!", Duration = 3})
-    end
-end)
-
-addButton(miscPage, "📂 โหลดตั้งค่า (Load Config)", function()
-    if readfile and isfile and isfile(configFileName) then
-        local success, result = pcall(function()
-            return HttpService:JSONEncode(readfile(configFileName))
-        end)
-        if success and result then
-            espEnabled = result.espEnabled or false
-            inspectEnabled = result.inspectEnabled or false
-            gearHudEnabled = result.gearHudEnabled or false
-            teamCheckEnabled = result.teamCheckEnabled or false
-            aimbotEnabled = result.aimbotEnabled or false
-            wallCheckEnabled = result.wallCheckEnabled or false
-            fovEnabled = result.fovEnabled or false
-            instantPickupEnabled = result.instantPickupEnabled or false
-            hitboxExpanded = result.hitboxExpanded or false
-            recoilControlEnabled = result.recoilControlEnabled or false
-            hitboxSize = result.hitboxSize or 7
-            aimSmoothness = result.aimSmoothness or 0.25
-            fovRadius = result.fovRadius or 140
-            targetPartName = result.targetPartName or "Head"
-            game:GetService("StarterGui"):SetCore("SendNotification", {Title = "Syrex Hub", Text = "โหลดการตั้งค่าสำเร็จ!", Duration = 3})
-        end
-    end
-end)
+addToggle(gunPage, "No Recoil / Anti Shake", recoilControlEnabled, function(s) recoilControlEnabled = s end)
 
 -- Default Tab
 aimPage.Visible = true
 aimTab.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
 aimTab.TextColor3 = Color3.fromRGB(255, 255, 255)
 
--- RIGHT CTRL HOTKEY
+-- UI Toggle
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.KeyCode == Enum.KeyCode.RightControl then
         MainFrame.Visible = not MainFrame.Visible
+    end
+end)
+
+-- Aim Key Logic
+local function isAimInput(input)
+    if selectedAimKey == "Always On" then return true end
+    if selectedAimKey == "Right Click" and input.UserInputType == Enum.UserInputType.MouseButton2 then return true end
+    if selectedAimKey == "Left Click" and input.UserInputType == Enum.UserInputType.MouseButton1 then return true end
+    if selectedAimKey == "Left Shift" and input.KeyCode == Enum.KeyCode.LeftShift then return true end
+    if selectedAimKey == "E Key" and input.KeyCode == Enum.KeyCode.E then return true end
+    return false
+end
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if isAimInput(input) and selectedAimKey ~= "Always On" then
+        if selectedAimTrigger == "Hold" then
+            isAimingState = true
+        else
+            isAimingState = not isAimingState
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if isAimInput(input) and selectedAimTrigger == "Hold" and selectedAimKey ~= "Always On" then
+        isAimingState = false
     end
 end)
 
@@ -471,87 +411,19 @@ local fovCorner = Instance.new("UICorner")
 fovCorner.Parent = fovFrame
 fovCorner.CornerRadius = UDim.new(1, 0)
 
--- TARGET GEAR BILLBOARD CREATOR (แสดงไอเทม 3 ช่องเรียลไทม์ใต้ตัวศัตรู)
-local function createTargetGearHUD(character)
-    if not character then return end
-    local rootPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head")
-    if not rootPart then return end
-
-    if rootPart:FindFirstChild("TargetGearHUD") then
-        rootPart.TargetGearHUD:Destroy()
-    end
-
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "TargetGearHUD"
-    billboard.Adornee = rootPart
-    billboard.Size = UDim2.new(0, 160, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, -3.8, 0) -- ตำแหน่งใต้เท้า/ใต้กล่อง ESP
-    billboard.AlwaysOnTop = true
-    billboard.Enabled = false
-    billboard.Parent = rootPart
-
-    local container = Instance.new("Frame")
-    container.Parent = billboard
-    container.Size = UDim2.new(1, 0, 1, 0)
-    container.BackgroundTransparency = 1
-
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.Parent = container
-    listLayout.FillDirection = Enum.FillDirection.Horizontal
-    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    listLayout.Padding = UDim.new(0, 6)
-
-    -- สร้างกล่องไอเทม 3 ช่อง
-    for i = 1, 3 do
-        local slot = Instance.new("Frame")
-        slot.Name = "Slot" .. tostring(i)
-        slot.Parent = container
-        slot.Size = UDim2.new(0, 44, 0, 44)
-        slot.BackgroundColor3 = Color3.fromRGB(30, 25, 20)
-        slot.BackgroundTransparency = 0.3
-
-        local slotCorner = Instance.new("UICorner")
-        slotCorner.CornerRadius = UDim.new(0, 8)
-        slotCorner.Parent = slot
-
-        local slotStroke = Instance.new("UIStroke")
-        slotStroke.Parent = slot
-        slotStroke.Color = Color3.fromRGB(80, 70, 60)
-        slotStroke.Thickness = 1
-
-        local iconImg = Instance.new("ImageLabel")
-        iconImg.Name = "Icon"
-        iconImg.Parent = slot
-        iconImg.Size = UDim2.new(0, 32, 0, 32)
-        iconImg.Position = UDim2.new(0.5, -16, 0.5, -16)
-        iconImg.BackgroundTransparency = 1
-        iconImg.Visible = false
-
-        local nameTxt = Instance.new("TextLabel")
-        nameTxt.Name = "ItemName"
-        nameTxt.Parent = slot
-        nameTxt.Size = UDim2.new(1, -4, 1, -4)
-        nameTxt.Position = UDim2.new(0, 2, 0, 2)
-        nameTxt.BackgroundTransparency = 1
-        nameTxt.Text = ""
-        nameTxt.TextColor3 = Color3.fromRGB(240, 220, 200)
-        nameTxt.TextSize = 9
-        nameTxt.Font = Enum.Font.GothamBold
-        nameTxt.TextWrapped = true
-    end
-
-    return billboard
-end
-
 -- Helper Functions
 local function getRootPart(character)
     if not character then return nil end
-    return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head") or character.PrimaryPart
+    return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso") or character.PrimaryPart
 end
 
 local function getTargetPart(character)
     if not character then return nil end
-    return character:FindFirstChild(targetPartName) or character:FindFirstChild("Head") or getRootPart(character)
+    local part = character:FindFirstChild(targetPartName)
+    if not part then
+        part = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or getRootPart(character)
+    end
+    return part
 end
 
 local function isEnemy(player)
@@ -578,12 +450,166 @@ end
 local function isValidTarget(player)
     if not player or player == LocalPlayer or not player.Character then return false end
     if not isEnemy(player) then return false end
-    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
     local targetPart = getTargetPart(player.Character)
-    return humanoid and humanoid.Health > 0 and targetPart ~= nil
+    if not targetPart then return false end
+    
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if humanoid and humanoid.Health <= 0 then return false end
+    
+    return true
 end
 
--- Setup ESP and Gear HUD on players
+-- UNIVERSAL DEEP ITEM SCANNER
+local function getPlayerLoadoutData(player)
+    local data = {weapon = "None", armor = "None", helmet = "None"}
+    if not player or not player.Character then return data end
+    local char = player.Character
+
+    local function scanName(str, instName)
+        local n = string.lower(str)
+        -- Weapon
+        if string.find(n, "honey") or string.find(n, "badger") or string.find(n, "rifle") or string.find(n, "gun") or string.find(n, "weapon") or string.find(n, "ak") or string.find(n, "m4") or string.find(n, "ar") or string.find(n, "smg") then
+            data.weapon = instName
+        -- Armor
+        elseif string.find(n, "guerilla") or string.find(n, "armor") or string.find(n, "vest") or string.find(n, "custom") or string.find(n, "plate") then
+            data.armor = instName
+        -- Helmet
+        elseif string.find(n, "helmet") or string.find(n, "style") or string.find(n, "k.") or string.find(n, "headgear") or string.find(n, "mask") then
+            data.helmet = instName
+        end
+    end
+
+    -- 1. Scan Tools (Equipped / Backpack)
+    local tool = char:FindFirstChildOfClass("Tool") or (player:FindFirstChild("Backpack") and player.Backpack:FindFirstChildOfClass("Tool"))
+    if tool then data.weapon = tool.Name end
+
+    -- 2. Scan Character Descendants (Models, Accessories, Folders, Value Objects)
+    for _, item in pairs(char:GetDescendants()) do
+        if item:IsA("Accessory") or item:IsA("Model") or item:IsA("Folder") or item:IsA("Value") or item:IsA("Tool") then
+            scanName(item.Name, item.Name)
+            if item:IsA("StringValue") and item.Value ~= "" then
+                scanName(item.Value, item.Value)
+            end
+        end
+    end
+
+    -- 3. Scan Character / Player Attributes
+    local charAttrs = char:GetAttributes()
+    for attrName, attrVal in pairs(charAttrs) do
+        if type(attrVal) == "string" then
+            scanName(attrVal, attrVal)
+        end
+    end
+
+    local playerAttrs = player:GetAttributes()
+    for attrName, attrVal in pairs(playerAttrs) do
+        if type(attrVal) == "string" then
+            scanName(attrVal, attrVal)
+        end
+    end
+
+    -- Format display string length max 12 chars
+    data.weapon = string.sub(data.weapon, 1, 12)
+    data.armor = string.sub(data.armor, 1, 12)
+    data.helmet = string.sub(data.helmet, 1, 12)
+
+    return data
+end
+
+-- COMPACT LOADOUT HUD + 2D BOX ESP CREATOR
+local function createPlayerESP(character)
+    if not character then return end
+    local rootPart = getRootPart(character)
+    if not rootPart then return end
+
+    -- 1. Compact Gear HUD
+    if rootPart:FindFirstChild("TargetGearHUD") then rootPart.TargetGearHUD:Destroy() end
+    local gearBillboard = Instance.new("BillboardGui")
+    gearBillboard.Name = "TargetGearHUD"
+    gearBillboard.Adornee = rootPart
+    gearBillboard.Size = UDim2.new(0, 160, 0, 36)
+    gearBillboard.StudsOffset = Vector3.new(0, -3.8, 0)
+    gearBillboard.AlwaysOnTop = true
+    gearBillboard.Enabled = false
+    gearBillboard.Parent = rootPart
+
+    local gearContainer = Instance.new("Frame")
+    gearContainer.Name = "GearContainer"
+    gearContainer.Parent = gearBillboard
+    gearContainer.Size = UDim2.new(1, 0, 1, 0)
+    gearContainer.BackgroundTransparency = 1
+
+    local gLayout = Instance.new("UIListLayout")
+    gLayout.Parent = gearContainer
+    gLayout.FillDirection = Enum.FillDirection.Horizontal
+    gLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    gLayout.Padding = UDim.new(0, 4)
+
+    local categories = {"WEAPON", "ARMOR", "HELMET"}
+    for i, catName in ipairs(categories) do
+        local slot = Instance.new("Frame")
+        slot.Name = "Slot" .. tostring(i)
+        slot.Parent = gearContainer
+        slot.Size = UDim2.new(0, 50, 0, 34)
+        slot.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
+        slot.BackgroundTransparency = 0.2
+
+        local sCorner = Instance.new("UICorner")
+        sCorner.CornerRadius = UDim.new(0, 5)
+        sCorner.Parent = slot
+
+        local sStroke = Instance.new("UIStroke")
+        sStroke.Parent = slot
+        sStroke.Color = Color3.fromRGB(60, 60, 75)
+        sStroke.Thickness = 1
+
+        local itemName = Instance.new("TextLabel")
+        itemName.Name = "ItemName"
+        itemName.Parent = slot
+        itemName.Position = UDim2.new(0, 2, 0, 2)
+        itemName.Size = UDim2.new(1, -4, 0, 18)
+        itemName.BackgroundTransparency = 1
+        itemName.Text = "None"
+        itemName.TextColor3 = Color3.fromRGB(240, 240, 240)
+        itemName.TextSize = 9
+        itemName.Font = Enum.Font.GothamBold
+        itemName.TextWrapped = true
+
+        local subType = Instance.new("TextLabel")
+        subType.Name = "SubType"
+        subType.Parent = slot
+        subType.Position = UDim2.new(0, 0, 1, -12)
+        subType.Size = UDim2.new(1, 0, 0, 10)
+        subType.BackgroundTransparency = 1
+        subType.Text = catName
+        subType.TextColor3 = Color3.fromRGB(220, 160, 60)
+        subType.TextSize = 7
+        subType.Font = Enum.Font.GothamBold
+    end
+
+    -- 2. 2D Box ESP
+    if rootPart:FindFirstChild("BoxESPBillboard") then rootPart.BoxESPBillboard:Destroy() end
+    local boxBillboard = Instance.new("BillboardGui")
+    boxBillboard.Name = "BoxESPBillboard"
+    boxBillboard.Adornee = rootPart
+    boxBillboard.Size = UDim2.new(4.5, 0, 6, 0)
+    boxBillboard.AlwaysOnTop = true
+    boxBillboard.Enabled = false
+    boxBillboard.Parent = rootPart
+
+    local boxFrame = Instance.new("Frame")
+    boxFrame.Parent = boxBillboard
+    boxFrame.Size = UDim2.new(1, 0, 1, 0)
+    boxFrame.BackgroundTransparency = 1
+
+    local boxStroke = Instance.new("UIStroke")
+    boxStroke.Name = "BoxStroke"
+    boxStroke.Parent = boxFrame
+    boxStroke.Color = Color3.fromRGB(255, 50, 50)
+    boxStroke.Thickness = 1.8
+end
+
+-- Setup Player Visuals
 local function applyESP(player)
     if player == LocalPlayer then return end
 
@@ -596,7 +622,7 @@ local function applyESP(player)
         highlight.Name = "ESPHighlight"
         highlight.Adornee = char
         highlight.FillColor = Color3.fromRGB(255, 50, 50)
-        highlight.FillTransparency = 0.6
+        highlight.FillTransparency = 0.75
         highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
         highlight.Enabled = espEnabled and isEnemy(player)
         highlight.Parent = char
@@ -605,7 +631,7 @@ local function applyESP(player)
         local bgui = Instance.new("BillboardGui")
         bgui.Name = "ESPBillboard"
         bgui.Adornee = rootPart
-        bgui.Size = UDim2.new(0, 180, 0, 25)
+        bgui.Size = UDim2.new(0, 140, 0, 20)
         bgui.StudsOffset = Vector3.new(0, 3.2, 0)
         bgui.AlwaysOnTop = true
         bgui.Enabled = espEnabled and isEnemy(player)
@@ -616,13 +642,13 @@ local function applyESP(player)
         txt.Parent = bgui
         txt.Size = UDim2.new(1, 0, 1, 0)
         txt.BackgroundTransparency = 1
-        txt.Text = "[ " .. player.Name .. " ]"
+        txt.Text = player.Name
         txt.TextColor3 = Color3.fromRGB(255, 255, 255)
         txt.TextStrokeTransparency = 0
-        txt.TextSize = 12
+        txt.TextSize = 11
         txt.Font = Enum.Font.GothamBold
 
-        createTargetGearHUD(char)
+        createPlayerESP(char)
     end
 
     if player.Character then task.spawn(setupChar, player.Character) end
@@ -632,58 +658,37 @@ end
 for _, p in pairs(Players:GetPlayers()) do applyESP(p) end
 Players.PlayerAdded:Connect(applyESP)
 
--- Fast Realtime Gear Update & ESP Loop
+-- Realtime Sync Loop (ESP & Loadout)
 task.spawn(function()
     while true do
-        task.wait(0.08)
+        task.wait(0.1)
         pcall(function()
             for _, player in pairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer and player.Character then
                     local targetRoot = getRootPart(player.Character)
                     if targetRoot then
                         local gearHud = targetRoot:FindFirstChild("TargetGearHUD")
-                        local shouldShowGear = gearHudEnabled and isEnemy(player)
+                        local boxEsp = targetRoot:FindFirstChild("BoxESPBillboard")
+                        local highlight = player.Character:FindFirstChild("ESPHighlight")
+                        local isTargetEnemy = isEnemy(player)
+
+                        if highlight then highlight.Enabled = espEnabled and isTargetEnemy end
+                        if boxEsp then boxEsp.Enabled = espBoxEnabled and isTargetEnemy end
 
                         if gearHud then
-                            gearHud.Enabled = shouldShowGear
-                            if shouldShowGear then
-                                local itemsList = {}
-                                local tool = player.Character:FindFirstChildOfClass("Tool")
-                                if tool then table.insert(itemsList, tool) end
-
-                                if player:FindFirstChild("Backpack") then
-                                    for _, bItem in pairs(player.Backpack:GetChildren()) do
-                                        if bItem:IsA("Tool") and #itemsList < 3 then
-                                            table.insert(itemsList, bItem)
-                                        end
-                                    end
-                                end
-
-                                local container = gearHud:FindFirstChild("Frame")
+                            gearHud.Enabled = gearHudEnabled and isTargetEnemy
+                            if gearHud.Enabled then
+                                local loadout = getPlayerLoadoutData(player)
+                                local container = gearHud:FindFirstChild("GearContainer")
                                 if container then
-                                    for i = 1, 3 do
-                                        local slot = container:FindFirstChild("Slot" .. tostring(i))
-                                        if slot then
-                                            local item = itemsList[i]
-                                            local iconImg = slot:FindFirstChild("Icon")
-                                            local nameTxt = slot:FindFirstChild("ItemName")
-
-                                            if item then
-                                                if item.TextureId ~= "" and iconImg then
-                                                    iconImg.Image = item.TextureId
-                                                    iconImg.Visible = true
-                                                    if nameTxt then nameTxt.Text = "" end
-                                                elseif nameTxt then
-                                                    if iconImg then iconImg.Visible = false end
-                                                    nameTxt.Text = string.sub(item.Name, 1, 10)
-                                                end
-                                                slot.BackgroundTransparency = 0.2
-                                            else
-                                                if iconImg then iconImg.Visible = false end
-                                                if nameTxt then nameTxt.Text = "-" end
-                                                slot.BackgroundTransparency = 0.6
-                                            end
-                                        end
+                                    if container:FindFirstChild("Slot1") and container.Slot1:FindFirstChild("ItemName") then
+                                        container.Slot1.ItemName.Text = loadout.weapon
+                                    end
+                                    if container:FindFirstChild("Slot2") and container.Slot2:FindFirstChild("ItemName") then
+                                        container.Slot2.ItemName.Text = loadout.armor
+                                    end
+                                    if container:FindFirstChild("Slot3") and container.Slot3:FindFirstChild("ItemName") then
+                                        container.Slot3.ItemName.Text = loadout.helmet
                                     end
                                 end
                             end
@@ -695,25 +700,7 @@ task.spawn(function()
     end
 end)
 
--- Hitbox Heartbeat
-RunService.Heartbeat:Connect(function()
-    if hitboxExpanded then
-        pcall(function()
-            for _, player in pairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character then
-                    local head = player.Character:FindFirstChild("Head")
-                    if head and isEnemy(player) then
-                        head.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-                        head.Transparency = 0.5
-                        head.CanCollide = false
-                    end
-                end
-            end
-        end)
-    end
-end)
-
--- AIMBOT ENGINE (FIXED V30)
+-- AIMBOT TARGET LOCATOR
 local function getClosestPlayerToMouse()
     local closestPlayer = nil
     local shortestDistance = fovEnabled and fovRadius or 99999
@@ -737,20 +724,18 @@ local function getClosestPlayerToMouse()
     return closestPlayer
 end
 
--- RenderStepped Aimbot Loop
-RunService.RenderStepped:Connect(function()
+-- HARD-LOCK AIMBOT ENGINE (MULTIPLE HOOKS FOR MAXIMUM LOCK)
+local function updateAimbot()
     fovFrame.Size = UDim2.new(0, fovRadius * 2, 0, fovRadius * 2)
     fovFrame.Visible = fovEnabled
 
-    -- No Recoil Camera Lock
     if recoilControlEnabled then
         Camera.RotVelocity = Vector3.new(0, 0, 0)
     end
 
-    -- ตรวจจับคลิกขวา (MouseButton2) หรือคลิกซ้าย (MouseButton1)
-    local isHoldingAim = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) or UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+    local activeAiming = (selectedAimKey == "Always On") or isAimingState
 
-    if aimbotEnabled and isHoldingAim then
+    if aimbotEnabled and activeAiming then
         if not stickyTarget or not isValidTarget(stickyTarget) then
             stickyTarget = getClosestPlayerToMouse()
         end
@@ -759,11 +744,12 @@ RunService.RenderStepped:Connect(function()
             local targetPart = getTargetPart(stickyTarget.Character)
             if targetPart then
                 local targetPos = targetPart.Position
+                local currentCamPos = Camera.CFrame.Position
                 
-                if aimMode == "Smooth Cam" then
-                    Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetPos), aimSmoothness)
-                elseif aimMode == "Hard Lock" then
-                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPos)
+                if aimMode == "Direct CFrame" then
+                    Camera.CFrame = CFrame.new(currentCamPos, targetPos)
+                elseif aimMode == "Smooth Cam" then
+                    Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(currentCamPos, targetPos), aimSmoothness)
                 elseif aimMode == "Mouse Delta" then
                     local screenPos, onScreen = Camera:WorldToViewportPoint(targetPos)
                     if onScreen then
@@ -773,7 +759,7 @@ RunService.RenderStepped:Connect(function()
                         if mousemoverel then
                             mousemoverel(deltaX, deltaY)
                         else
-                            Camera.CFrame = Camera.CFrame:Lerp(CFrame.lookAt(Camera.CFrame.Position, targetPos), aimSmoothness)
+                            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(currentCamPos, targetPos), aimSmoothness)
                         end
                     end
                 end
@@ -782,7 +768,11 @@ RunService.RenderStepped:Connect(function()
     else
         stickyTarget = nil
     end
-end)
+end
+
+-- Connect to RenderStepped & Stepped to override custom game cameras
+RunService.RenderStepped:Connect(updateAimbot)
+RunService.Stepped:Connect(updateAimbot)
 
 -- Instant Pickup
 ProximityPromptService.PromptShown:Connect(function(prompt)
