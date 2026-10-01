@@ -1,9 +1,8 @@
--- Syrex Hub Ultimate V35 (Optimized Engine + Anti-Katana + High-Priority Aim Lock)
+-- Syrex Hub Ultimate V36 (Clean UI + Fixed Aim Engine)
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
@@ -12,12 +11,10 @@ local Camera = workspace.CurrentCamera
 -- Config Values
 local espEnabled = true
 local espBoxEnabled = true
-local gearHudEnabled = true
 local teamCheckEnabled = false
 local aimbotEnabled = true
 local wallCheckEnabled = false
 local fovEnabled = true
-local instantPickupEnabled = false
 local recoilControlEnabled = true
 
 -- Aim Settings
@@ -31,7 +28,7 @@ local aimModes = {"Direct CFrame", "Smooth Cam", "Mouse Delta"}
 local currentAimModeIndex = 1
 local aimMode = aimModes[currentAimModeIndex]
 
-local smoothnessLevels = {0.2, 0.4, 0.6, 0.8, 1.0}
+local smoothnessLevels = {0.1, 0.25, 0.5, 0.75, 1.0}
 local currentSmoothIndex = 3
 local aimSmoothness = smoothnessLevels[currentSmoothIndex]
 
@@ -43,17 +40,15 @@ local targetParts = {"Head", "HumanoidRootPart", "UpperTorso"}
 local currentTargetIndex = 1
 local targetPartName = targetParts[currentTargetIndex]
 
-local stickyTarget = nil
-
 -- Clean Old UI
 local parentGui = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
-if parentGui:FindFirstChild("SyrexHub_v35") then
-    parentGui:FindFirstChild("SyrexHub_v35"):Destroy()
+if parentGui:FindFirstChild("SyrexHub_v36") then
+    parentGui:FindFirstChild("SyrexHub_v36"):Destroy()
 end
 
 -- ScreenGui Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SyrexHub_v35"
+ScreenGui.Name = "SyrexHub_v36"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = parentGui
 
@@ -64,7 +59,7 @@ MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
 MainFrame.BorderSizePixel = 0
 MainFrame.Position = UDim2.new(0.3, 0, 0.2, 0)
-MainFrame.Size = UDim2.new(0, 560, 0, 420)
+MainFrame.Size = UDim2.new(0, 520, 0, 380)
 MainFrame.Active = true
 MainFrame.Draggable = true
 
@@ -77,7 +72,7 @@ local Sidebar = Instance.new("Frame")
 Sidebar.Name = "Sidebar"
 Sidebar.Parent = MainFrame
 Sidebar.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
-Sidebar.Size = UDim2.new(0, 150, 1, 0)
+Sidebar.Size = UDim2.new(0, 140, 1, 0)
 Sidebar.BorderSizePixel = 0
 
 local sidebarCorner = Instance.new("UICorner")
@@ -100,7 +95,7 @@ SubTitle.Parent = HubTitle
 SubTitle.Size = UDim2.new(1, 0, 0, 15)
 SubTitle.Position = UDim2.new(0, 0, 0, 20)
 SubTitle.BackgroundTransparency = 1
-SubTitle.Text = "v35 • [Right-Ctrl]"
+SubTitle.Text = "v36 • [Right-Ctrl]"
 SubTitle.TextColor3 = Color3.fromRGB(120, 120, 130)
 SubTitle.TextSize = 10
 SubTitle.Font = Enum.Font.Gotham
@@ -121,8 +116,8 @@ tabLayout.Padding = UDim.new(0, 6)
 local ContentArea = Instance.new("Frame")
 ContentArea.Name = "ContentArea"
 ContentArea.Parent = MainFrame
-ContentArea.Position = UDim2.new(0, 160, 0, 10)
-ContentArea.Size = UDim2.new(1, -170, 1, -20)
+ContentArea.Position = UDim2.new(0, 150, 0, 10)
+ContentArea.Size = UDim2.new(1, -160, 1, -20)
 ContentArea.BackgroundTransparency = 1
 
 local pages = {}
@@ -156,7 +151,7 @@ local function addTab(name, icon)
     btn.Size = UDim2.new(1, 0, 0, 32)
     btn.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
     btn.BorderSizePixel = 0
-    btn.Text = "   " .. icon .. "   " .. name
+    btn.Text = "  " .. icon .. "  " .. name
     btn.TextColor3 = Color3.fromRGB(180, 180, 190)
     btn.TextSize = 11
     btn.Font = Enum.Font.GothamMedium
@@ -183,7 +178,7 @@ local function addTab(name, icon)
     return btn
 end
 
--- Controls
+-- UI Controls
 local function addToggle(page, labelText, defaultState, callback)
     local container = Instance.new("Frame")
     container.Parent = page
@@ -296,7 +291,7 @@ local function addClicker(page, labelText, defaultValText, callback)
     end)
 end
 
--- Initialize Pages
+-- Create Pages
 local aimPage = createPage("Aim")
 local visualsPage = createPage("Visuals")
 local gunPage = createPage("Gun Mods")
@@ -343,9 +338,8 @@ addClicker(aimPage, "FOV Radius (px)", tostring(fovRadius) .. " px", function()
 end)
 
 -- Build Visuals Page
-addToggle(visualsPage, "Player ESP", espEnabled, function(s) espEnabled = s end)
-addToggle(visualsPage, "2D Box ESP", espBoxEnabled, function(s) espBoxEnabled = s end)
-addToggle(visualsPage, "Compact Loadout HUD", gearHudEnabled, function(s) gearHudEnabled = s end)
+addToggle(visualsPage, "Player ESP (ชื่อ)", espEnabled, function(s) espEnabled = s end)
+addToggle(visualsPage, "2D Box ESP (กรอบตัวศัตรู)", espBoxEnabled, function(s) espBoxEnabled = s end)
 
 -- Build Gun Mods Page
 addToggle(gunPage, "No Recoil / Anti Shake", recoilControlEnabled, function(s) recoilControlEnabled = s end)
@@ -385,7 +379,7 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- FOV Circle
+-- FOV Circle Visual
 local fovFrame = Instance.new("Frame")
 fovFrame.Parent = ScreenGui
 fovFrame.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -403,7 +397,7 @@ local fovCorner = Instance.new("UICorner")
 fovCorner.Parent = fovFrame
 fovCorner.CornerRadius = UDim.new(1, 0)
 
--- Lightweight Part Search
+-- Core Helpers
 local function getRootPart(character)
     if not character then return nil end
     return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head") or character:FindFirstChild("UpperTorso") or character.PrimaryPart
@@ -447,171 +441,76 @@ local function isValidTarget(player)
     return true
 end
 
--- ANTI-KATANA & LIGHTWEIGHT GEAR SCANNER
-local function getPlayerLoadoutData(player)
-    local data = {weapon = "None", armor = "None", helmet = "None"}
-    if not player or not player.Character then return data end
-    local char = player.Character
-
-    local function checkAndSet(str, rawName)
-        if not str then return end
-        local n = string.lower(str)
-        
-        -- Blacklist Katana and Melee items
-        if string.find(n, "katana") or string.find(n, "sword") or string.find(n, "blade") or string.find(n, "knife") or string.find(n, "melee") then
-            return
-        end
-
-        -- Filter Guns
-        if (string.find(n, "honey") or string.find(n, "badger") or string.find(n, "rifle") or string.find(n, "gun") or string.find(n, "ar") or string.find(n, "smg") or string.find(n, "shotgun") or string.find(n, "ak") or string.find(n, "m4")) then
-            data.weapon = rawName
-        -- Filter Armor
-        elseif (string.find(n, "guerilla") or string.find(n, "armor") or string.find(n, "vest") or string.find(n, "plate") or string.find(n, "custom")) then
-            data.armor = rawName
-        -- Filter Helmet
-        elseif (string.find(n, "helmet") or string.find(n, "style") or string.find(n, "k.") or string.find(n, "headgear")) then
-            data.helmet = rawName
-        end
-    end
-
-    -- 1. Scan Equiped Tool
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool then checkAndSet(tool.Name, tool.Name) end
-
-    -- 2. Fast Scan Direct Children Only (Lag Free)
-    for _, item in pairs(char:GetChildren()) do
-        checkAndSet(item.Name, item.Name)
-    end
-
-    data.weapon = string.sub(data.weapon, 1, 12)
-    data.armor = string.sub(data.armor, 1, 12)
-    data.helmet = string.sub(data.helmet, 1, 12)
-
-    return data
-end
-
--- COMPACT HUD & BOX ESP
-local function createPlayerESP(character)
-    if not character then return end
-    local rootPart = getRootPart(character)
-    if not rootPart then return end
-
-    if rootPart:FindFirstChild("TargetGearHUD") then rootPart.TargetGearHUD:Destroy() end
-    local gearBillboard = Instance.new("BillboardGui")
-    gearBillboard.Name = "TargetGearHUD"
-    gearBillboard.Adornee = rootPart
-    gearBillboard.Size = UDim2.new(0, 160, 0, 36)
-    gearBillboard.StudsOffset = Vector3.new(0, -3.8, 0)
-    gearBillboard.AlwaysOnTop = true
-    gearBillboard.Enabled = false
-    gearBillboard.Parent = rootPart
-
-    local gearContainer = Instance.new("Frame")
-    gearContainer.Parent = gearBillboard
-    gearContainer.Size = UDim2.new(1, 0, 1, 0)
-    gearContainer.BackgroundTransparency = 1
-
-    local gLayout = Instance.new("UIListLayout")
-    gLayout.Parent = gearContainer
-    gLayout.FillDirection = Enum.FillDirection.Horizontal
-    gLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    gLayout.Padding = UDim.new(0, 4)
-
-    local categories = {"WEAPON", "ARMOR", "HELMET"}
-    for i, catName in ipairs(categories) do
-        local slot = Instance.new("Frame")
-        slot.Name = "Slot" .. tostring(i)
-        slot.Parent = gearContainer
-        slot.Size = UDim2.new(0, 50, 0, 34)
-        slot.BackgroundColor3 = Color3.fromRGB(15, 15, 18)
-        slot.BackgroundTransparency = 0.2
-
-        local sCorner = Instance.new("UICorner")
-        sCorner.CornerRadius = UDim.new(0, 5)
-        sCorner.Parent = slot
-
-        local itemName = Instance.new("TextLabel")
-        itemName.Name = "ItemName"
-        itemName.Parent = slot
-        itemName.Position = UDim2.new(0, 2, 0, 2)
-        itemName.Size = UDim2.new(1, -4, 0, 18)
-        itemName.BackgroundTransparency = 1
-        itemName.Text = "None"
-        itemName.TextColor3 = Color3.fromRGB(240, 240, 240)
-        itemName.TextSize = 9
-        itemName.Font = Enum.Font.GothamBold
-
-        local subType = Instance.new("TextLabel")
-        subType.Parent = slot
-        subType.Position = UDim2.new(0, 0, 1, -12)
-        subType.Size = UDim2.new(1, 0, 0, 10)
-        subType.BackgroundTransparency = 1
-        subType.Text = catName
-        subType.TextColor3 = Color3.fromRGB(220, 160, 60)
-        subType.TextSize = 7
-        subType.Font = Enum.Font.GothamBold
-    end
-
-    if rootPart:FindFirstChild("BoxESPBillboard") then rootPart.BoxESPBillboard:Destroy() end
-    local boxBillboard = Instance.new("BillboardGui")
-    boxBillboard.Name = "BoxESPBillboard"
-    boxBillboard.Adornee = rootPart
-    boxBillboard.Size = UDim2.new(4.5, 0, 6, 0)
-    boxBillboard.AlwaysOnTop = true
-    boxBillboard.Enabled = false
-    boxBillboard.Parent = rootPart
-
-    local boxFrame = Instance.new("Frame")
-    boxFrame.Parent = boxBillboard
-    boxFrame.Size = UDim2.new(1, 0, 1, 0)
-    boxFrame.BackgroundTransparency = 1
-
-    local boxStroke = Instance.new("UIStroke")
-    boxStroke.Parent = boxFrame
-    boxStroke.Color = Color3.fromRGB(255, 50, 50)
-    boxStroke.Thickness = 1.8
-end
-
+-- CLEAN ESP (NAMES & BOXES ONLY)
 local function applyESP(player)
     if player == LocalPlayer then return end
+
     local function setupChar(char)
         if not char then return end
-        createPlayerESP(char)
+        local rootPart = getRootPart(char) or char:WaitForChild("HumanoidRootPart", 5) or char:WaitForChild("Head", 5)
+        if not rootPart then return end
+
+        if rootPart:FindFirstChild("ESPBillboard") then rootPart.ESPBillboard:Destroy() end
+        local bgui = Instance.new("BillboardGui")
+        bgui.Name = "ESPBillboard"
+        bgui.Adornee = rootPart
+        bgui.Size = UDim2.new(0, 140, 0, 20)
+        bgui.StudsOffset = Vector3.new(0, 3.2, 0)
+        bgui.AlwaysOnTop = true
+        bgui.Parent = rootPart
+
+        local txt = Instance.new("TextLabel")
+        txt.Name = "ESPText"
+        txt.Parent = bgui
+        txt.Size = UDim2.new(1, 0, 1, 0)
+        txt.BackgroundTransparency = 1
+        txt.Text = player.Name
+        txt.TextColor3 = Color3.fromRGB(255, 255, 255)
+        txt.TextStrokeTransparency = 0
+        txt.TextSize = 11
+        txt.Font = Enum.Font.GothamBold
+
+        if rootPart:FindFirstChild("BoxESPBillboard") then rootPart.BoxESPBillboard:Destroy() end
+        local boxBillboard = Instance.new("BillboardGui")
+        boxBillboard.Name = "BoxESPBillboard"
+        boxBillboard.Adornee = rootPart
+        boxBillboard.Size = UDim2.new(4.5, 0, 6, 0)
+        boxBillboard.AlwaysOnTop = true
+        boxBillboard.Parent = rootPart
+
+        local boxFrame = Instance.new("Frame")
+        boxFrame.Parent = boxBillboard
+        boxFrame.Size = UDim2.new(1, 0, 1, 0)
+        boxFrame.BackgroundTransparency = 1
+
+        local boxStroke = Instance.new("UIStroke")
+        boxStroke.Parent = boxFrame
+        boxStroke.Color = Color3.fromRGB(255, 50, 50)
+        boxStroke.Thickness = 1.8
     end
-    if player.Character then setupChar(player.Character) end
-    player.CharacterAdded:Connect(setupChar)
+
+    if player.Character then task.spawn(setupChar, player.Character) end
+    player.CharacterAdded:Connect(function(char) task.spawn(setupChar, char) end)
 end
 
 for _, p in pairs(Players:GetPlayers()) do applyESP(p) end
 Players.PlayerAdded:Connect(applyESP)
 
--- OPTIMIZED ITEM REFRESH (0.8s INTERVAL)
+-- Sync ESP Visibility
 task.spawn(function()
     while true do
-        task.wait(0.8)
+        task.wait(0.3)
         pcall(function()
             for _, player in pairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer and player.Character then
                     local targetRoot = getRootPart(player.Character)
                     if targetRoot then
-                        local gearHud = targetRoot:FindFirstChild("TargetGearHUD")
+                        local espBgui = targetRoot:FindFirstChild("ESPBillboard")
                         local boxEsp = targetRoot:FindFirstChild("BoxESPBillboard")
                         local isTargetEnemy = isEnemy(player)
 
+                        if espBgui then espBgui.Enabled = espEnabled and isTargetEnemy end
                         if boxEsp then boxEsp.Enabled = espBoxEnabled and isTargetEnemy end
-
-                        if gearHud then
-                            gearHud.Enabled = gearHudEnabled and isTargetEnemy
-                            if gearHud.Enabled then
-                                local loadout = getPlayerLoadoutData(player)
-                                local container = gearHud:FindFirstChild("Frame")
-                                if container then
-                                    if container:FindFirstChild("Slot1") then container.Slot1.ItemName.Text = loadout.weapon end
-                                    if container:FindFirstChild("Slot2") then container.Slot2.ItemName.Text = loadout.armor end
-                                    if container:FindFirstChild("Slot3") then container.Slot3.ItemName.Text = loadout.helmet end
-                                end
-                            end
-                        end
                     end
                 end
             end
@@ -619,9 +518,9 @@ task.spawn(function()
     end
 end)
 
--- AIMBOT LOCATOR
+-- AIMBOT TARGET LOCATOR
 local function getClosestPlayerToMouse()
-    local closestPlayer = nil
+    local closestTarget = nil
     local shortestDistance = fovEnabled and fovRadius or 99999
     local mousePos = UserInputService:GetMouseLocation()
 
@@ -634,62 +533,52 @@ local function getClosestPlayerToMouse()
                     local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
                     if dist < shortestDistance then
                         shortestDistance = dist
-                        closestPlayer = player
+                        closestTarget = {player = player, part = targetPart}
                     end
                 end
             end
         end
     end
-    return closestPlayer
+    return closestTarget
 end
 
--- HIGH-PRIORITY AIM LOCK ENGINE
-local function updateAimbot()
+-- DIRECT RENDERSTEPPED AIM LOCK ENGINE
+RunService.RenderStepped:Connect(function()
+    -- FOV Circle Position & Size Update
     fovFrame.Size = UDim2.new(0, fovRadius * 2, 0, fovRadius * 2)
     fovFrame.Visible = fovEnabled
 
+    -- No Recoil
     if recoilControlEnabled then
         Camera.RotVelocity = Vector3.new(0, 0, 0)
     end
 
+    -- Aim Engine
     local activeAiming = (selectedAimKey == "Always On") or isAimingState
 
     if aimbotEnabled and activeAiming then
-        stickyTarget = getClosestPlayerToMouse()
+        local targetData = getClosestPlayerToMouse()
+        if targetData and targetData.part then
+            local targetPos = targetData.part.Position
+            local currentCamPos = Camera.CFrame.Position
 
-        if stickyTarget and isValidTarget(stickyTarget) then
-            local targetPart = getTargetPart(stickyTarget.Character)
-            if targetPart then
-                local targetPos = targetPart.Position
-                local currentCamPos = Camera.CFrame.Position
-
-                if aimMode == "Direct CFrame" then
-                    Camera.CFrame = CFrame.new(currentCamPos, targetPos)
-                elseif aimMode == "Smooth Cam" then
-                    Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(currentCamPos, targetPos), aimSmoothness)
-                elseif aimMode == "Mouse Delta" then
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(targetPos)
-                    if onScreen then
-                        local mousePos = UserInputService:GetMouseLocation()
-                        local deltaX = (screenPos.X - mousePos.X) * aimSmoothness
-                        local deltaY = (screenPos.Y - mousePos.Y) * aimSmoothness
-                        if mousemoverel then
-                            mousemoverel(deltaX, deltaY)
-                        else
-                            Camera.CFrame = CFrame.new(currentCamPos, targetPos)
-                        end
+            if aimMode == "Direct CFrame" then
+                Camera.CFrame = CFrame.new(currentCamPos, targetPos)
+            elseif aimMode == "Smooth Cam" then
+                Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(currentCamPos, targetPos), aimSmoothness)
+            elseif aimMode == "Mouse Delta" then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(targetPos)
+                if onScreen then
+                    local mousePos = UserInputService:GetMouseLocation()
+                    local deltaX = (screenPos.X - mousePos.X) * aimSmoothness
+                    local deltaY = (screenPos.Y - mousePos.Y) * aimSmoothness
+                    if mousemoverel then
+                        mousemoverel(deltaX, deltaY)
+                    else
+                        Camera.CFrame = CFrame.new(currentCamPos, targetPos)
                     end
                 end
             end
         end
     end
-end
-
--- High-Priority Camera Override Connection
-RunService:UnbindFromRenderStep("SyrexAimLock")
-RunService:BindToRenderStep("SyrexAimLock", Enum.RenderPriority.Camera.Value + 1, updateAimbot)
-
--- Instant Pickup
-ProximityPromptService.PromptShown:Connect(function(prompt)
-    if instantPickupEnabled then prompt.HoldDuration = 0 end
 end)
