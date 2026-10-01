@@ -1,4 +1,4 @@
--- Syrex Hub Ultimate V34 (Universal Item Scanner + Hard-Lock Aim Engine)
+-- Syrex Hub Ultimate V35 (Optimized Engine + Anti-Katana + High-Priority Aim Lock)
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
@@ -25,17 +25,13 @@ local aimKeysList = {"Always On", "Right Click", "Left Click", "Left Shift", "E 
 local currentAimKeyIndex = 1
 local selectedAimKey = aimKeysList[currentAimKeyIndex]
 
-local aimTriggersList = {"Hold", "Toggle"}
-local currentAimTriggerIndex = 1
-local selectedAimTrigger = aimTriggersList[currentAimTriggerIndex]
-
 local isAimingState = true
 
 local aimModes = {"Direct CFrame", "Smooth Cam", "Mouse Delta"}
 local currentAimModeIndex = 1
 local aimMode = aimModes[currentAimModeIndex]
 
-local smoothnessLevels = {0.15, 0.3, 0.5, 0.8, 1.0}
+local smoothnessLevels = {0.2, 0.4, 0.6, 0.8, 1.0}
 local currentSmoothIndex = 3
 local aimSmoothness = smoothnessLevels[currentSmoothIndex]
 
@@ -51,13 +47,13 @@ local stickyTarget = nil
 
 -- Clean Old UI
 local parentGui = (gethui and gethui()) or CoreGui or LocalPlayer:WaitForChild("PlayerGui")
-if parentGui:FindFirstChild("SyrexHub_v34") then
-    parentGui:FindFirstChild("SyrexHub_v34"):Destroy()
+if parentGui:FindFirstChild("SyrexHub_v35") then
+    parentGui:FindFirstChild("SyrexHub_v35"):Destroy()
 end
 
 -- ScreenGui Setup
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "SyrexHub_v34"
+ScreenGui.Name = "SyrexHub_v35"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Parent = parentGui
 
@@ -104,7 +100,7 @@ SubTitle.Parent = HubTitle
 SubTitle.Size = UDim2.new(1, 0, 0, 15)
 SubTitle.Position = UDim2.new(0, 0, 0, 20)
 SubTitle.BackgroundTransparency = 1
-SubTitle.Text = "v34 • [Right-Ctrl]"
+SubTitle.Text = "v35 • [Right-Ctrl]"
 SubTitle.TextColor3 = Color3.fromRGB(120, 120, 130)
 SubTitle.TextSize = 10
 SubTitle.Font = Enum.Font.Gotham
@@ -310,12 +306,12 @@ local visualsTab = addTab("Visuals", "👁️")
 local gunTab = addTab("Gun Mods", "🔫")
 
 -- Build Aim Page
-addToggle(aimPage, "Aimbot Lock Master", aimbotEnabled, function(s) aimbotEnabled = s end)
-addClicker(aimPage, "Aim Key (ปุ่มเปิดล็อก)", selectedAimKey, function()
+addToggle(aimPage, "Aimbot Master Lock", aimbotEnabled, function(s) aimbotEnabled = s end)
+addClicker(aimPage, "Aim Key (ปุ่มเล็ง)", selectedAimKey, function()
     currentAimKeyIndex = currentAimKeyIndex + 1
     if currentAimKeyIndex > #aimKeysList then currentAimKeyIndex = 1 end
     selectedAimKey = aimKeysList[currentAimKeyIndex]
-    if selectedAimKey == "Always On" then isAimingState = true end
+    isAimingState = (selectedAimKey == "Always On")
     return selectedAimKey
 end)
 addClicker(aimPage, "Aim Mode", aimMode, function()
@@ -330,7 +326,7 @@ addClicker(aimPage, "Aim Smoothness", tostring(aimSmoothness), function()
     aimSmoothness = smoothnessLevels[currentSmoothIndex]
     return tostring(aimSmoothness)
 end)
-addToggle(aimPage, "Wall Check (ไม่ยิงทะลุกำแพง)", wallCheckEnabled, function(s) wallCheckEnabled = s end)
+addToggle(aimPage, "Wall Check (ไม่ยิงหลังกำแพง)", wallCheckEnabled, function(s) wallCheckEnabled = s end)
 addToggle(aimPage, "Team Check (ไม่ล็อกพวกเดียวกัน)", teamCheckEnabled, function(s) teamCheckEnabled = s end)
 addClicker(aimPage, "Target Part", targetPartName, function()
     currentTargetIndex = currentTargetIndex + 1
@@ -347,9 +343,9 @@ addClicker(aimPage, "FOV Radius (px)", tostring(fovRadius) .. " px", function()
 end)
 
 -- Build Visuals Page
-addToggle(visualsPage, "Player ESP (ชื่อ/ระยะ)", espEnabled, function(s) espEnabled = s end)
-addToggle(visualsPage, "2D Box ESP (กรอบสี่เหลี่ยมรอบตัว)", espBoxEnabled, function(s) espBoxEnabled = s end)
-addToggle(visualsPage, "Compact Loadout HUD (ไอเทมศัตรู)", gearHudEnabled, function(s) gearHudEnabled = s end)
+addToggle(visualsPage, "Player ESP", espEnabled, function(s) espEnabled = s end)
+addToggle(visualsPage, "2D Box ESP", espBoxEnabled, function(s) espBoxEnabled = s end)
+addToggle(visualsPage, "Compact Loadout HUD", gearHudEnabled, function(s) gearHudEnabled = s end)
 
 -- Build Gun Mods Page
 addToggle(gunPage, "No Recoil / Anti Shake", recoilControlEnabled, function(s) recoilControlEnabled = s end)
@@ -379,16 +375,12 @@ end
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
     if isAimInput(input) and selectedAimKey ~= "Always On" then
-        if selectedAimTrigger == "Hold" then
-            isAimingState = true
-        else
-            isAimingState = not isAimingState
-        end
+        isAimingState = true
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if isAimInput(input) and selectedAimTrigger == "Hold" and selectedAimKey ~= "Always On" then
+    if isAimInput(input) and selectedAimKey ~= "Always On" then
         isAimingState = false
     end
 end)
@@ -411,19 +403,15 @@ local fovCorner = Instance.new("UICorner")
 fovCorner.Parent = fovFrame
 fovCorner.CornerRadius = UDim.new(1, 0)
 
--- Helper Functions
+-- Lightweight Part Search
 local function getRootPart(character)
     if not character then return nil end
-    return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso") or character.PrimaryPart
+    return character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head") or character:FindFirstChild("UpperTorso") or character.PrimaryPart
 end
 
 local function getTargetPart(character)
     if not character then return nil end
-    local part = character:FindFirstChild(targetPartName)
-    if not part then
-        part = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso") or getRootPart(character)
-    end
-    return part
+    return character:FindFirstChild(targetPartName) or character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("UpperTorso")
 end
 
 local function isEnemy(player)
@@ -452,63 +440,49 @@ local function isValidTarget(player)
     if not isEnemy(player) then return false end
     local targetPart = getTargetPart(player.Character)
     if not targetPart then return false end
-    
+
     local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
     if humanoid and humanoid.Health <= 0 then return false end
-    
+
     return true
 end
 
--- UNIVERSAL DEEP ITEM SCANNER
+-- ANTI-KATANA & LIGHTWEIGHT GEAR SCANNER
 local function getPlayerLoadoutData(player)
     local data = {weapon = "None", armor = "None", helmet = "None"}
     if not player or not player.Character then return data end
     local char = player.Character
 
-    local function scanName(str, instName)
+    local function checkAndSet(str, rawName)
+        if not str then return end
         local n = string.lower(str)
-        -- Weapon
-        if string.find(n, "honey") or string.find(n, "badger") or string.find(n, "rifle") or string.find(n, "gun") or string.find(n, "weapon") or string.find(n, "ak") or string.find(n, "m4") or string.find(n, "ar") or string.find(n, "smg") then
-            data.weapon = instName
-        -- Armor
-        elseif string.find(n, "guerilla") or string.find(n, "armor") or string.find(n, "vest") or string.find(n, "custom") or string.find(n, "plate") then
-            data.armor = instName
-        -- Helmet
-        elseif string.find(n, "helmet") or string.find(n, "style") or string.find(n, "k.") or string.find(n, "headgear") or string.find(n, "mask") then
-            data.helmet = instName
+        
+        -- Blacklist Katana and Melee items
+        if string.find(n, "katana") or string.find(n, "sword") or string.find(n, "blade") or string.find(n, "knife") or string.find(n, "melee") then
+            return
+        end
+
+        -- Filter Guns
+        if (string.find(n, "honey") or string.find(n, "badger") or string.find(n, "rifle") or string.find(n, "gun") or string.find(n, "ar") or string.find(n, "smg") or string.find(n, "shotgun") or string.find(n, "ak") or string.find(n, "m4")) then
+            data.weapon = rawName
+        -- Filter Armor
+        elseif (string.find(n, "guerilla") or string.find(n, "armor") or string.find(n, "vest") or string.find(n, "plate") or string.find(n, "custom")) then
+            data.armor = rawName
+        -- Filter Helmet
+        elseif (string.find(n, "helmet") or string.find(n, "style") or string.find(n, "k.") or string.find(n, "headgear")) then
+            data.helmet = rawName
         end
     end
 
-    -- 1. Scan Tools (Equipped / Backpack)
-    local tool = char:FindFirstChildOfClass("Tool") or (player:FindFirstChild("Backpack") and player.Backpack:FindFirstChildOfClass("Tool"))
-    if tool then data.weapon = tool.Name end
+    -- 1. Scan Equiped Tool
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then checkAndSet(tool.Name, tool.Name) end
 
-    -- 2. Scan Character Descendants (Models, Accessories, Folders, Value Objects)
-    for _, item in pairs(char:GetDescendants()) do
-        if item:IsA("Accessory") or item:IsA("Model") or item:IsA("Folder") or item:IsA("Value") or item:IsA("Tool") then
-            scanName(item.Name, item.Name)
-            if item:IsA("StringValue") and item.Value ~= "" then
-                scanName(item.Value, item.Value)
-            end
-        end
+    -- 2. Fast Scan Direct Children Only (Lag Free)
+    for _, item in pairs(char:GetChildren()) do
+        checkAndSet(item.Name, item.Name)
     end
 
-    -- 3. Scan Character / Player Attributes
-    local charAttrs = char:GetAttributes()
-    for attrName, attrVal in pairs(charAttrs) do
-        if type(attrVal) == "string" then
-            scanName(attrVal, attrVal)
-        end
-    end
-
-    local playerAttrs = player:GetAttributes()
-    for attrName, attrVal in pairs(playerAttrs) do
-        if type(attrVal) == "string" then
-            scanName(attrVal, attrVal)
-        end
-    end
-
-    -- Format display string length max 12 chars
     data.weapon = string.sub(data.weapon, 1, 12)
     data.armor = string.sub(data.armor, 1, 12)
     data.helmet = string.sub(data.helmet, 1, 12)
@@ -516,13 +490,12 @@ local function getPlayerLoadoutData(player)
     return data
 end
 
--- COMPACT LOADOUT HUD + 2D BOX ESP CREATOR
+-- COMPACT HUD & BOX ESP
 local function createPlayerESP(character)
     if not character then return end
     local rootPart = getRootPart(character)
     if not rootPart then return end
 
-    -- 1. Compact Gear HUD
     if rootPart:FindFirstChild("TargetGearHUD") then rootPart.TargetGearHUD:Destroy() end
     local gearBillboard = Instance.new("BillboardGui")
     gearBillboard.Name = "TargetGearHUD"
@@ -534,7 +507,6 @@ local function createPlayerESP(character)
     gearBillboard.Parent = rootPart
 
     local gearContainer = Instance.new("Frame")
-    gearContainer.Name = "GearContainer"
     gearContainer.Parent = gearBillboard
     gearContainer.Size = UDim2.new(1, 0, 1, 0)
     gearContainer.BackgroundTransparency = 1
@@ -558,11 +530,6 @@ local function createPlayerESP(character)
         sCorner.CornerRadius = UDim.new(0, 5)
         sCorner.Parent = slot
 
-        local sStroke = Instance.new("UIStroke")
-        sStroke.Parent = slot
-        sStroke.Color = Color3.fromRGB(60, 60, 75)
-        sStroke.Thickness = 1
-
         local itemName = Instance.new("TextLabel")
         itemName.Name = "ItemName"
         itemName.Parent = slot
@@ -573,10 +540,8 @@ local function createPlayerESP(character)
         itemName.TextColor3 = Color3.fromRGB(240, 240, 240)
         itemName.TextSize = 9
         itemName.Font = Enum.Font.GothamBold
-        itemName.TextWrapped = true
 
         local subType = Instance.new("TextLabel")
-        subType.Name = "SubType"
         subType.Parent = slot
         subType.Position = UDim2.new(0, 0, 1, -12)
         subType.Size = UDim2.new(1, 0, 0, 10)
@@ -587,7 +552,6 @@ local function createPlayerESP(character)
         subType.Font = Enum.Font.GothamBold
     end
 
-    -- 2. 2D Box ESP
     if rootPart:FindFirstChild("BoxESPBillboard") then rootPart.BoxESPBillboard:Destroy() end
     local boxBillboard = Instance.new("BillboardGui")
     boxBillboard.Name = "BoxESPBillboard"
@@ -603,65 +567,28 @@ local function createPlayerESP(character)
     boxFrame.BackgroundTransparency = 1
 
     local boxStroke = Instance.new("UIStroke")
-    boxStroke.Name = "BoxStroke"
     boxStroke.Parent = boxFrame
     boxStroke.Color = Color3.fromRGB(255, 50, 50)
     boxStroke.Thickness = 1.8
 end
 
--- Setup Player Visuals
 local function applyESP(player)
     if player == LocalPlayer then return end
-
     local function setupChar(char)
         if not char then return end
-        local rootPart = getRootPart(char) or char:WaitForChild("HumanoidRootPart", 5) or char:WaitForChild("Head", 5)
-        if not rootPart then return end
-
-        local highlight = char:FindFirstChild("ESPHighlight") or Instance.new("Highlight")
-        highlight.Name = "ESPHighlight"
-        highlight.Adornee = char
-        highlight.FillColor = Color3.fromRGB(255, 50, 50)
-        highlight.FillTransparency = 0.75
-        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-        highlight.Enabled = espEnabled and isEnemy(player)
-        highlight.Parent = char
-
-        if rootPart:FindFirstChild("ESPBillboard") then rootPart.ESPBillboard:Destroy() end
-        local bgui = Instance.new("BillboardGui")
-        bgui.Name = "ESPBillboard"
-        bgui.Adornee = rootPart
-        bgui.Size = UDim2.new(0, 140, 0, 20)
-        bgui.StudsOffset = Vector3.new(0, 3.2, 0)
-        bgui.AlwaysOnTop = true
-        bgui.Enabled = espEnabled and isEnemy(player)
-        bgui.Parent = rootPart
-
-        local txt = Instance.new("TextLabel")
-        txt.Name = "ESPText"
-        txt.Parent = bgui
-        txt.Size = UDim2.new(1, 0, 1, 0)
-        txt.BackgroundTransparency = 1
-        txt.Text = player.Name
-        txt.TextColor3 = Color3.fromRGB(255, 255, 255)
-        txt.TextStrokeTransparency = 0
-        txt.TextSize = 11
-        txt.Font = Enum.Font.GothamBold
-
         createPlayerESP(char)
     end
-
-    if player.Character then task.spawn(setupChar, player.Character) end
-    player.CharacterAdded:Connect(function(char) task.spawn(setupChar, char) end)
+    if player.Character then setupChar(player.Character) end
+    player.CharacterAdded:Connect(setupChar)
 end
 
 for _, p in pairs(Players:GetPlayers()) do applyESP(p) end
 Players.PlayerAdded:Connect(applyESP)
 
--- Realtime Sync Loop (ESP & Loadout)
+-- OPTIMIZED ITEM REFRESH (0.8s INTERVAL)
 task.spawn(function()
     while true do
-        task.wait(0.1)
+        task.wait(0.8)
         pcall(function()
             for _, player in pairs(Players:GetPlayers()) do
                 if player ~= LocalPlayer and player.Character then
@@ -669,27 +596,19 @@ task.spawn(function()
                     if targetRoot then
                         local gearHud = targetRoot:FindFirstChild("TargetGearHUD")
                         local boxEsp = targetRoot:FindFirstChild("BoxESPBillboard")
-                        local highlight = player.Character:FindFirstChild("ESPHighlight")
                         local isTargetEnemy = isEnemy(player)
 
-                        if highlight then highlight.Enabled = espEnabled and isTargetEnemy end
                         if boxEsp then boxEsp.Enabled = espBoxEnabled and isTargetEnemy end
 
                         if gearHud then
                             gearHud.Enabled = gearHudEnabled and isTargetEnemy
                             if gearHud.Enabled then
                                 local loadout = getPlayerLoadoutData(player)
-                                local container = gearHud:FindFirstChild("GearContainer")
+                                local container = gearHud:FindFirstChild("Frame")
                                 if container then
-                                    if container:FindFirstChild("Slot1") and container.Slot1:FindFirstChild("ItemName") then
-                                        container.Slot1.ItemName.Text = loadout.weapon
-                                    end
-                                    if container:FindFirstChild("Slot2") and container.Slot2:FindFirstChild("ItemName") then
-                                        container.Slot2.ItemName.Text = loadout.armor
-                                    end
-                                    if container:FindFirstChild("Slot3") and container.Slot3:FindFirstChild("ItemName") then
-                                        container.Slot3.ItemName.Text = loadout.helmet
-                                    end
+                                    if container:FindFirstChild("Slot1") then container.Slot1.ItemName.Text = loadout.weapon end
+                                    if container:FindFirstChild("Slot2") then container.Slot2.ItemName.Text = loadout.armor end
+                                    if container:FindFirstChild("Slot3") then container.Slot3.ItemName.Text = loadout.helmet end
                                 end
                             end
                         end
@@ -700,7 +619,7 @@ task.spawn(function()
     end
 end)
 
--- AIMBOT TARGET LOCATOR
+-- AIMBOT LOCATOR
 local function getClosestPlayerToMouse()
     local closestPlayer = nil
     local shortestDistance = fovEnabled and fovRadius or 99999
@@ -712,9 +631,9 @@ local function getClosestPlayerToMouse()
             if targetPart and isVisible(targetPart) then
                 local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                 if onScreen then
-                    local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                    if distance < shortestDistance then
-                        shortestDistance = distance
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < shortestDistance then
+                        shortestDistance = dist
                         closestPlayer = player
                     end
                 end
@@ -724,7 +643,7 @@ local function getClosestPlayerToMouse()
     return closestPlayer
 end
 
--- HARD-LOCK AIMBOT ENGINE (MULTIPLE HOOKS FOR MAXIMUM LOCK)
+-- HIGH-PRIORITY AIM LOCK ENGINE
 local function updateAimbot()
     fovFrame.Size = UDim2.new(0, fovRadius * 2, 0, fovRadius * 2)
     fovFrame.Visible = fovEnabled
@@ -736,16 +655,14 @@ local function updateAimbot()
     local activeAiming = (selectedAimKey == "Always On") or isAimingState
 
     if aimbotEnabled and activeAiming then
-        if not stickyTarget or not isValidTarget(stickyTarget) then
-            stickyTarget = getClosestPlayerToMouse()
-        end
+        stickyTarget = getClosestPlayerToMouse()
 
         if stickyTarget and isValidTarget(stickyTarget) then
             local targetPart = getTargetPart(stickyTarget.Character)
             if targetPart then
                 local targetPos = targetPart.Position
                 local currentCamPos = Camera.CFrame.Position
-                
+
                 if aimMode == "Direct CFrame" then
                     Camera.CFrame = CFrame.new(currentCamPos, targetPos)
                 elseif aimMode == "Smooth Cam" then
@@ -759,20 +676,18 @@ local function updateAimbot()
                         if mousemoverel then
                             mousemoverel(deltaX, deltaY)
                         else
-                            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(currentCamPos, targetPos), aimSmoothness)
+                            Camera.CFrame = CFrame.new(currentCamPos, targetPos)
                         end
                     end
                 end
             end
         end
-    else
-        stickyTarget = nil
     end
 end
 
--- Connect to RenderStepped & Stepped to override custom game cameras
-RunService.RenderStepped:Connect(updateAimbot)
-RunService.Stepped:Connect(updateAimbot)
+-- High-Priority Camera Override Connection
+RunService:UnbindFromRenderStep("SyrexAimLock")
+RunService:BindToRenderStep("SyrexAimLock", Enum.RenderPriority.Camera.Value + 1, updateAimbot)
 
 -- Instant Pickup
 ProximityPromptService.PromptShown:Connect(function(prompt)
